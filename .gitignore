@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+
+# YOLO model weights
+*.pt
+*.onnx
+
+# Generated alerts
+backend/alerts.json
+
+# Generated snapshots
+snapshots/*.jpg
+snapshots/*.jpeg
+snapshots/*.png
+
+# Generated videos
+snapshots/*.mp4
+snapshots/*.avi
+snapshots/*.mov
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/

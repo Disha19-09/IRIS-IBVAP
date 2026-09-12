@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IRIS // IBVAP Command Console</title>
+<style>
+  :root {
+    --bg: #0a0e0c;
+    --panel: #121815;
+    --line: #23302a;
+    --amber: #e8a13c;
+    --green: #4ade80;
+    --red: #ef4444;
+    --text: #d9e2dc;
+    --dim: #6b7d73;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  header .wordmark {
+    font-size: 20px;
+    letter-spacing: 1px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  header .wordmark span { color: var(--amber); }
+  header .sub {
+    font-size: 13px;
+    color: var(--dim);
+    margin-top: 2px;
+  }
+  .clock { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 13px; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .stat {
+    background: var(--panel);
+    padding: 18px 24px;
+  }
+  .stat .label {
+    font-size: 12px;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+  .stat .value {
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat.alert .value { color: var(--amber); }
+
+  main {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1px;
+    background: var(--line);
+  }
+  .feed, .detail {
+    background: var(--panel);
+    min-height: 60vh;
+    padding: 20px 24px;
+  }
+  .feed h2, .detail h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--dim);
+    font-weight: 600;
+    margin: 0 0 16px 0;
+  }
+  .alert-row {
+    display: grid;
+    grid-template-columns: 90px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .alert-row:hover { background: #16201b; }
+  .alert-row .time {
+    font-size: 12px;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .alert-row .desc { font-size: 14px; }
+  .alert-row .desc .cls {
+    color: var(--green);
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .alert-row .plate {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--amber);
+    margin-top: 3px;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 3px 9px;
+    border: 1px solid var(--red);
+    color: var(--red);
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .empty {
+    color: var(--dim);
+    font-size: 14px;
+    padding: 40px 0;
+    text-align: center;
+  }
+  .detail img {
+    width: 100%;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    display: block;
+    margin-bottom: 16px;
+  }
+  .detail .placeholder {
+    color: var(--dim);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .detail dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    font-size: 13px;
+  }
+  .detail dt { color: var(--dim); }
+  .detail dd { margin: 0; }
+  .fence-line {
+    height: 2px;
+    background: repeating-linear-gradient(90deg, var(--amber) 0 8px, transparent 8px 14px);
+    margin: 4px 0 20px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="wordmark">IRIS <span>// IBVAP</span></div>
+    <div class="sub">Intelligent Border Video Analytics Platform &mdash; Command Console</div>
+  </div>
+  <div class="clock" id="clock">--:--:--</div>
+</header>
+
+<div class="fence-line"></div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">Feed Status</div>
+    <div class="value" id="feedStatus" style="color: var(--green); font-size:18px;">CONNECTING</div>
+  </div>
+  <div class="stat alert">
+    <div class="label">Total Alerts Logged</div>
+    <div class="value" id="totalAlerts">0</div>
+  </div>
+  <div class="stat">
+    <div class="label">Vehicles w/ Plate Read</div>
+    <div class="value" id="plateCount">0</div>
+  </div>
+  <div class="stat">
+    <div class="label">Last Event</div>
+    <div class="value" id="lastEvent" style="font-size:16px;">&mdash;</div>
+  </div>
+</div>
+
+<main>
+  <section class="feed">
+    <h2>Live Alert Feed</h2>
+    <div id="alertList"><div class="empty">Waiting for alerts from the pipeline&hellip;</div></div>
+  </section>
+  <section class="detail">
+    <h2>Event Snapshot</h2>
+    <div id="detailPane" class="placeholder">Select an alert from the feed to view its snapshot and details.</div>
+  </section>
+</main>
+
+<script>
+  const API_BASE = "http://localhost:8000";
+
+  function tick() {
+    document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  function timeAgo(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString();
+  }
+
+  function renderAlerts(alerts) {
+    const list = document.getElementById("alertList");
+    document.getElementById("totalAlerts").textContent = alerts.length;
+    document.getElementById("plateCount").textContent =
+      alerts.filter(a => a.plate_text).length;
+    document.getElementById("lastEvent").textContent =
+      alerts.length ? timeAgo(alerts[0].timestamp) : "—";
+
+    if (!alerts.length) {
+      list.innerHTML = '<div class="empty">Waiting for alerts from the pipeline&hellip;</div>';
+      return;
+    }
+
+    list.innerHTML = alerts.map(a => `
+      <div class="alert-row" onclick='showDetail(${JSON.stringify(a).replace(/'/g, "&apos;")})'>
+        <div class="time">${timeAgo(a.timestamp)}</div>
+        <div class="desc">
+          <div><span class="cls">${a.object_class}</span> crossed virtual fence &mdash; ID #${a.track_id}</div>
+          ${a.plate_text ? `<div class="plate">PLATE: ${a.plate_text}</div>` : ""}
+        </div>
+        <div class="tag">FENCE</div>
+      </div>
+    `).join("");
+  }
+
+  function showDetail(alert) {
+    const pane = document.getElementById("detailPane");
+    pane.innerHTML = `
+      <img src="${API_BASE}/snapshots/${alert.snapshot}" alt="snapshot" onerror="this.style.display='none'">
+      <dl>
+        <dt>Object class</dt><dd>${alert.object_class}</dd>
+        <dt>Track ID</dt><dd>#${alert.track_id}</dd>
+        <dt>Timestamp</dt><dd>${new Date(alert.timestamp).toLocaleString()}</dd>
+        <dt>Plate reading</dt><dd>${alert.plate_text || "Not applicable / not detected"}</dd>
+        <dt>Alert type</dt><dd>${alert.type}</dd>
+      </dl>
+    `;
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(`${API_BASE}/alerts`);
+      const alerts = await res.json();
+      document.getElementById("feedStatus").textContent = "LIVE";
+      document.getElementById("feedStatus").style.color = "var(--green)";
+      renderAlerts(alerts);
+    } catch (e) {
+      document.getElementById("feedStatus").textContent = "OFFLINE";
+      document.getElementById("feedStatus").style.color = "var(--red)";
+    }
+  }
+
+  poll();
+  setInterval(poll, 2000);
+</script>
+
+</body>
+</html>
