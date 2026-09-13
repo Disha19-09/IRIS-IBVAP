@@ -214,7 +214,7 @@
     const list = document.getElementById("alertList");
     document.getElementById("totalAlerts").textContent = alerts.length;
     document.getElementById("plateCount").textContent =
-      alerts.filter(a => a.plate_text).length;
+      alerts.filter(a => a.plate_number).length;
     document.getElementById("lastEvent").textContent =
       alerts.length ? timeAgo(alerts[0].timestamp) : "—";
 
@@ -227,8 +227,8 @@
       <div class="alert-row" onclick='showDetail(${JSON.stringify(a).replace(/'/g, "&apos;")})'>
         <div class="time">${timeAgo(a.timestamp)}</div>
         <div class="desc">
-          <div><span class="cls">${a.object_class}</span> crossed virtual fence &mdash; ID #${a.track_id}</div>
-          ${a.plate_text ? `<div class="plate">PLATE: ${a.plate_text}</div>` : ""}
+          <div><span class="cls">${a.object_type}</span> crossed virtual fence &mdash; ID #${a.track_id}</div>
+          ${a.plate_number ? `<div class="plate">PLATE: ${a.plate_number}</div>` : ""}
         </div>
         <div class="tag">FENCE</div>
       </div>
@@ -238,13 +238,13 @@
   function showDetail(alert) {
     const pane = document.getElementById("detailPane");
     pane.innerHTML = `
-      <img src="${API_BASE}/snapshots/${alert.snapshot}" alt="snapshot" onerror="this.style.display='none'">
+      <img src="${API_BASE}/snapshots/${alert.snapshot_path}" alt="snapshot" onerror="this.style.display='none'">
       <dl>
-        <dt>Object class</dt><dd>${alert.object_class}</dd>
+        <dt>Object class</dt><dd>${alert.object_type}</dd>
         <dt>Track ID</dt><dd>#${alert.track_id}</dd>
         <dt>Timestamp</dt><dd>${new Date(alert.timestamp).toLocaleString()}</dd>
-        <dt>Plate reading</dt><dd>${alert.plate_text || "Not applicable / not detected"}</dd>
-        <dt>Alert type</dt><dd>${alert.type}</dd>
+        <dt>Plate reading</dt><dd>${alert.plate_number || "Not applicable / not detected"}</dd>
+        <dt>Alert type</dt><dd>${alert.event_type}</dd>
       </dl>
     `;
   }
