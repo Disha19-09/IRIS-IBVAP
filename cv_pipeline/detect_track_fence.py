@@ -23,6 +23,8 @@ No GPU needed. Runs on CPU.
 import argparse
 import json
 import os
+import threading
+import time
 from datetime import datetime
 
 import cv2
@@ -248,6 +250,102 @@ def run_anpr(crop_img):
 
         return None
 
+# ---------------------------------------------------------------------------
+# RTSP HELPERS
+# ---------------------------------------------------------------------------
+
+def is_rtsp(source):
+    """
+    Check whether the source is an RTSP stream.
+    """
+    return (
+        isinstance(source, str)
+        and source.lower().startswith("rtsp://")
+    )
+
+
+class LatestFrameCapture:
+    """
+    Continuously reads an RTSP stream in a background thread.
+
+    Only the latest frame is kept, so the AI pipeline does not
+    build up a backlog of old frames.
+    """
+
+    def __init__(self, source):
+
+        self.source = source
+
+        self.cap = cv2.VideoCapture(source)
+
+        if is_rtsp(source):
+            self.cap.set(
+                cv2.CAP_PROP_BUFFERSIZE,
+                1
+            )
+
+        self.latest_frame = None
+
+        self.running = False
+
+        self.thread = None
+
+        self.lock = threading.Lock()
+
+
+    def start(self):
+
+        self.running = True
+
+        self.thread = threading.Thread(
+            target=self._capture_loop,
+            daemon=True
+        )
+
+        self.thread.start()
+
+        return self
+
+
+    def _capture_loop(self):
+
+        while self.running:
+
+            ret, frame = self.cap.read()
+
+            if ret:
+
+                with self.lock:
+
+                    self.latest_frame = frame
+
+            else:
+
+                time.sleep(0.05)
+
+
+    def read(self):
+
+        with self.lock:
+
+            if self.latest_frame is None:
+
+                return None
+
+            return self.latest_frame.copy()
+
+
+    def stop(self):
+
+        self.running = False
+
+        if self.thread is not None:
+
+            self.thread.join(
+                timeout=1
+            )
+
+        self.cap.release()
 
 # ---------------------------------------------------------------------------
 # MAIN PIPELINE
@@ -265,22 +363,51 @@ def main(source, run_anpr_flag, output_path):
 
 
     # -----------------------------------------------------------------------
-    # Open video
+    # Open video source
     # -----------------------------------------------------------------------
 
-    cap = cv2.VideoCapture(source)
+    rtsp_mode = is_rtsp(source)
 
-    if not cap.isOpened():
+    if rtsp_mode:
 
-        print(
-            f"[ERROR] Could not open video source: {source}"
-        )
+        latest_capture = LatestFrameCapture(source).start()
 
-        return
+        # Give the capture thread a moment to receive the first frame
+        time.sleep(0.5)
 
+        if not latest_capture.cap.isOpened():
 
-    # Get original video FPS
-    fps = cap.get(cv2.CAP_PROP_FPS) or 20
+            print(
+                f"[ERROR] Could not open RTSP source: {source}"
+            )
+
+            latest_capture.stop()
+
+            return
+
+        # RTSP streams may not report FPS correctly
+        fps = latest_capture.cap.get(
+            cv2.CAP_PROP_FPS
+        ) or 20
+
+    else:
+
+        latest_capture = None
+
+        cap = cv2.VideoCapture(source)
+
+        if not cap.isOpened():
+
+            print(
+                f"[ERROR] Could not open video source: {source}"
+            )
+
+            return
+
+        # Get original video FPS
+        fps = cap.get(
+            cv2.CAP_PROP_FPS
+        ) or 20
 
 
     # Video writer will be initialized after the first frame
@@ -332,14 +459,27 @@ def main(source, run_anpr_flag, output_path):
     # YOLO detection + tracking
     # -----------------------------------------------------------------------
 
-    for result in model.track(
-        source=source,
-        conf=CONF_THRESHOLD,
-        persist=True,
-        tracker="bytetrack.yaml",
-        stream=True,
-        verbose=False,
-    ):
+    while True:
+        if rtsp_mode:
+            frame = latest_capture.read()
+            if frame is None:
+                time.sleep(0.01)
+                continue
+        else:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+        # Run YOLO + ByteTrack on the current frame
+        results = model.track(
+            source=frame,
+            conf=CONF_THRESHOLD,
+            persist=True,
+            tracker="bytetrack.yaml",
+            verbose=False,
+        )
+
+        result = results[0]
 
         frame_idx += 1
 
@@ -835,7 +975,13 @@ def main(source, run_anpr_flag, output_path):
     # Cleanup
     # -----------------------------------------------------------------------
 
-    cap.release()
+    if rtsp_mode:
+
+        latest_capture.stop()
+
+    else:
+
+        cap.release()
 
 
     if writer is not None:
