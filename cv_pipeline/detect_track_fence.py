@@ -25,6 +25,7 @@ import json
 import os
 from datetime import datetime
 import csv
+import requests
 
 import cv2
 from ultralytics import YOLO
@@ -36,6 +37,8 @@ from ultralytics import YOLO
 
 MODEL_PATH = "yolov8n.pt"          # Nano model -> fastest on CPU
 CONF_THRESHOLD = 0.4               # Detection confidence cutoff
+BACKEND_URL = "http://localhost:8000/api/events"
+CAMERA_ID = "CAM_01"
 RESIZE_WIDTH = 640                 # Resize frames for speed
 PROCESS_EVERY_N_FRAMES = 1         # Set to 2 or 3 if video is laggy
 ALERT_CONSEC_FRAMES = 3             # Frames required to confirm crossing
@@ -188,24 +191,20 @@ def load_alerts():
 
 def save_alert(alert):
     """
-    Append a new alert to alerts.json.
+    Send the alert to the backend's /api/events endpoint so it gets
+    persisted to the database and broadcast over WebSocket.
+    Falls back to a local JSON file if the backend is unreachable,
+    so you don't lose alerts if the backend crashes mid-demo.
     """
-
-    alerts = load_alerts()
-
-    alerts.append(alert)
-
-    with open(
-        ALERTS_JSON_PATH,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            alerts,
-            f,
-            indent=2
-        )
+    try:
+        response = requests.post(BACKEND_URL, json=alert, timeout=2)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"[WARN] Backend unreachable, saving locally instead: {e}")
+        alerts = load_alerts()
+        alerts.append(alert)
+        with open(ALERTS_JSON_PATH, "w", encoding="utf-8") as f:
+            json.dump(alerts, f, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -845,14 +844,14 @@ def main(source, run_anpr_flag, output_path):
 
                             # Create alert record
                             alert = {
-                                "id": f"{timestamp}_{track_id}",
-                                "type": "loitering",
-                                "object_class": cls_name,
+                                "camera_id": CAMERA_ID,
+                                "event_type": "night_loitering" if is_night() else "loitering",
+                                "object_type": cls_name,
                                 "track_id": track_id,
                                 "confidence": round(confidence, 3),
                                 "timestamp": datetime.now().isoformat(),
-                                "snapshot": snap_name,
-                                "plate_text": plate_text,
+                                "snapshot_path": snap_name,
+                                "plate_number": plate_text,
                             }
 
                             # Save alert to JSON
@@ -981,31 +980,14 @@ def main(source, run_anpr_flag, output_path):
                     # -------------------------------------------------------
 
                     alert = {
-
-                        "id":
-                            f"{timestamp}_{track_id}",
-
-                        # change 5: Modified alert type to include night movement detection
-                        "type":
-                            "night_movement_crossing" if is_night() else "virtual_fence_crossing",
-
-                        "object_class":
-                            cls_name,
-
-                        "track_id":
-                            track_id,
-
-                        "confidence":
-                            round(confidence, 3),
-
-                        "timestamp":
-                            datetime.now().isoformat(),
-
-                        "snapshot":
-                            snap_name,
-
-                        "plate_text":
-                            plate_text,
+                        "camera_id": CAMERA_ID,
+                        "event_type": "night_movement_crossing" if is_night() else "virtual_fence_crossing",
+                        "object_type": cls_name,
+                        "track_id": track_id,
+                        "confidence": round(confidence, 3),
+                        "timestamp": datetime.now().isoformat(),
+                        "snapshot_path": snap_name,
+                        "plate_number": plate_text,
                     }
 
 
