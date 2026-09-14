@@ -1052,6 +1052,23 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
                                 crop
                             )
 
+                        # Draw plate number on frame if ANPR is enabled and we have a result
+                        if plate_text and run_anpr_flag:
+                            plate_label = f"Plate: {plate_text}"
+                            # Draw plate number below the class label
+                            cv2.putText(
+                                frame,
+                                plate_label,
+                                (
+                                    int(x1),
+                                    int(y2) + 20  # Position below the bounding box
+                                ),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5,
+                                (0, 255, 255),  # Yellow color for plate text
+                                2
+                            )
+
 
                     # -------------------------------------------------------
                     # Create alert record
