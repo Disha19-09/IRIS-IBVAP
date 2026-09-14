@@ -16,7 +16,7 @@ HOW TO RUN:
 
 For ANPR:
   python detect_track_fence.py --source ../sample_videos/test.mp4 --anpr
-
+[]
 No GPU needed. Runs on CPU.
 """
 
@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 from datetime import datetime
+import csv
 
 import cv2
 from ultralytics import YOLO
@@ -38,6 +39,27 @@ CONF_THRESHOLD = 0.4               # Detection confidence cutoff
 RESIZE_WIDTH = 640                 # Resize frames for speed
 PROCESS_EVERY_N_FRAMES = 1         # Set to 2 or 3 if video is laggy
 ALERT_CONSEC_FRAMES = 3             # Frames required to confirm crossing
+
+# change 1: Added loitering and night movement detection settings
+# Loitering detection settings
+LOITERING_TIME_THRESHOLD = 5.0     # Seconds an object must remain in loitering zone to trigger alert
+LOITERING_SIDE = 1                 # Side of the fence considered for loitering (1 or -1, as defined by side_of_line)
+
+# Night movement detection settings
+NIGHT_START_HOUR = 19              # Start of night (24-hour format, inclusive)
+NIGHT_END_HOUR = 6                 # End of night (24-hour format, exclusive)
+
+# change 7: Added minimum distance threshold for virtual fence crossing
+MIN_CROSS_DISTANCE = 10            # Minimum pixels an object must cross the line to be considered valid
+
+# change 8: Added hysteresis for side determination (to reduce jitter)
+SIDE_HYSTERESIS = 5                # Pixels buffer zone around the line for stable side detection
+
+# change 9: Added alert cooldown period
+ALERT_COOLDOWN_TIME = 5.0          # Seconds to wait before allowing another alert from the same track ID
+
+# ANPR configuration
+ANPR_CONFIDENCE_THRESHOLD = 0.3    # Minimum confidence for ANPR text detection
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +100,14 @@ ALERTS_JSON_PATH = os.path.join(
     "..",
     "backend",
     "alerts.json"
+)
+
+# D:\IRIS\iris_ibvap\backend\alerts.csv
+ALERTS_CSV_PATH = os.path.join(
+    BASE_DIR,
+    "..",
+    "backend",
+    "alerts.csv"
 )
 
 # D:\IRIS\iris_ibvap\snapshots
@@ -202,6 +232,64 @@ def side_of_line(point, line_start, line_end):
     )
 
 
+def distance_from_point_to_line(point, line_start, line_end):
+    """
+    Returns the perpendicular distance from a point to a line defined by two points.
+    """
+    x, y = point
+    x1, y1 = line_start
+    x2, y2 = line_end
+
+    # Calculate the area of the parallelogram formed by the points
+    area = abs((x2 - x1) * (y1 - y) - (x1 - x) * (y2 - y1))
+
+    # Calculate the length of the line segment
+    line_length = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+
+    # Avoid division by zero
+    if line_length == 0:
+        return 0
+
+    # Distance = area / base_length
+    return area / line_length
+
+
+def preprocess_for_anpr(image):
+    """
+    Simple preprocessing to improve OCR accuracy on license plate regions.
+    Converts to grayscale and applies contrast enhancement.
+    """
+    # Convert to grayscale if needed
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image.copy()
+
+    # Apply contrast enhancement using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+
+    # Apply slight Gaussian blur to reduce noise
+    blurred = cv2.GaussianBlur(enhanced, (3, 3), 0)
+
+    return blurred
+
+
+# change 2: Added is_night() function for night movement detection
+def is_night():
+    """
+    Returns True if current time is within night hours.
+    """
+    now = datetime.now()
+    hour = now.hour
+    if NIGHT_START_HOUR > NIGHT_END_HOUR:
+        # Night spans midnight (e.g., 22 to 6)
+        return hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR
+    else:
+        # Night within same day
+        return NIGHT_START_HOUR <= hour < NIGHT_END_HOUR
+
+
 # ---------------------------------------------------------------------------
 # ANPR
 # ---------------------------------------------------------------------------
@@ -220,7 +308,10 @@ def run_anpr(crop_img):
 
         reader = get_ocr_reader()
 
-        results = reader.readtext(crop_img)
+        # Preprocess the image to improve OCR accuracy
+        processed_img = preprocess_for_anpr(crop_img)
+
+        results = reader.readtext(processed_img)
 
         if not results:
             return None
@@ -234,7 +325,7 @@ def run_anpr(crop_img):
         text = best[1]
         conf = best[2]
 
-        if conf > 0.3:
+        if conf > ANPR_CONFIDENCE_THRESHOLD:
 
             return text.strip().upper()
 
@@ -302,9 +393,23 @@ def main(source, run_anpr_flag, output_path):
     # track_id -> side the object moved to after crossing
     crossing_direction = {}
 
+    # change 8: For hysteresis - track initial crossing point distance
+    # track_id -> distance from line when crossing was first detected
+    crossing_initial_distance = {}
 
+
+    # change 3: Added loitering tracking variables
     # track IDs that have already generated an alert
     already_alerted = set()
+    # Loitering tracking
+    # track_id -> timestamp when first entered loitering side
+    loitering_start_time = {}
+    # track IDs that have already generated a loitering alert
+    already_alerted_loitering = set()
+
+# change 9: Alert cooldown tracking
+    # track_id -> timestamp of last alert
+    last_alert_time = {}
 
 
     # -----------------------------------------------------------------------
@@ -592,20 +697,44 @@ def main(source, run_anpr_flag, output_path):
                 # Detect initial crossing
                 # -----------------------------------------------------------
 
+                # change 10: Improved side determination with hysteresis
+                # Calculate distance from line for hysteresis-based side determination
+                distance_from_line = distance_from_point_to_line(
+                    (cx, cy), LINE_START, LINE_END
+                )
+
+                # Apply hysteresis: only consider crossing if object has moved
+                # sufficiently past the line (reduces jitter near boundary)
+                effective_sign = 0
+                if distance_from_line > SIDE_HYSTERESIS:
+                    effective_sign = 1
+                elif distance_from_line < -SIDE_HYSTERESIS:
+                    effective_sign = -1
+                # If within hysteresis zone, maintain previous sign to avoid jitter
+                elif prev_sign is not None:
+                    effective_sign = prev_sign
+
+                prev_sign = last_side.get(track_id, 0)  # Default to 0 if no previous side
+
                 if (
                     prev_sign is not None
-                    and current_sign != 0
                     and prev_sign != 0
-                    and current_sign != prev_sign
+                    and effective_sign != 0
+                    and effective_sign != prev_sign
                 ):
-
-                    # Object changed sides.
+                    # Object changed sides with hysteresis applied.
                     #
                     # This is the first frame of the potential crossing.
 
-                    crossing_confirm_count[track_id] = 1
+                    # change 7: Add minimum distance threshold to reduce false positives
+                    # Only consider crossing valid if object has moved sufficient distance
+                    if distance_from_line >= MIN_CROSS_DISTANCE or distance_from_line <= -MIN_CROSS_DISTANCE:
+                        crossing_confirm_count[track_id] = 1
+                        crossing_direction[track_id] = effective_sign
 
-                    crossing_direction[track_id] = current_sign
+                        # change 8: For hysteresis - track initial crossing point distance
+                        # Store the distance from line when crossing was first detected
+                        crossing_initial_distance[track_id] = distance_from_line
 
 
                 # -----------------------------------------------------------
@@ -620,21 +749,53 @@ def main(source, run_anpr_flag, output_path):
                     # The object already crossed.
                     # Check whether it remains on the new side.
 
-                    if (
-                        current_sign
-                        == crossing_direction.get(track_id)
-                    ):
+                    # change 10: Apply hysteresis to current sign as well for consistency
+                    distance_from_line_current = distance_from_point_to_line(
+                        (cx, cy), LINE_START, LINE_END
+                    )
+
+                    effective_current_sign = 0
+                    if distance_from_line_current > SIDE_HYSTERESIS:
+                        effective_current_sign = 1
+                    elif distance_from_line_current < -SIDE_HYSTERESIS:
+                        effective_current_sign = -1
+                    # If within hysteresis zone, maintain previous effective sign to avoid jitter
+                    elif prev_sign is not None:
+                        effective_current_sign = prev_sign
+
+                    # change 8: Enhanced confirmation logic with directional consistency
+                    # Check not just side consistency but also that movement is away from line
+                    is_on_expected_side = (
+                        effective_current_sign == crossing_direction.get(track_id)
+                    )
+
+                    # change 7: Additional distance check - object should continue to move away
+                    # from the line or at least not move back significantly
+                    initial_distance = crossing_initial_distance.get(track_id, 0)
+                    distance_change = distance_from_line_current - initial_distance
+
+                    # Object is considered still crossing if:
+                    # 1. It's on the expected side (with hysteresis)
+                    # 2. It has not moved back past the initial crossing point by more than hysteresis threshold
+                    is_consistent_movement = is_on_expected_side and distance_change > -SIDE_HYSTERESIS
+
+                    if is_consistent_movement:
 
                         crossing_confirm_count[track_id] += 1
 
                     else:
 
-                        # Object did not remain on the new side.
+                        # Object did not remain on the new side or moved back.
                         # Treat it as a false crossing.
 
                         crossing_confirm_count[track_id] = 0
 
                         crossing_direction.pop(
+                            track_id,
+                            None
+                        )
+
+                        crossing_initial_distance.pop(
                             track_id,
                             None
                         )
@@ -646,6 +807,71 @@ def main(source, run_anpr_flag, output_path):
 
                     crossing_confirm_count[track_id] = 0
 
+                # change 4: Added loitering detection logic
+                # Loitering detection
+                if current_sign == LOITERING_SIDE:
+                    # Object is on the loitering side
+                    if track_id not in loitering_start_time:
+                        loitering_start_time[track_id] = datetime.now()
+                    else:
+                        # Check if loitering time threshold has been exceeded
+                        elapsed = datetime.now() - loitering_start_time[track_id]
+                        if elapsed.total_seconds() >= LOITERING_TIME_THRESHOLD and track_id not in already_alerted_loitering:
+                            # Trigger loitering alert
+                            already_alerted_loitering.add(track_id)
+                            # Create loitering alert (similar to crossing alert)
+                            # Timestamp
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+                            # Save evidence snapshot
+                            snap_name = (
+                                f"alert_"
+                                f"{timestamp}_"
+                                f"id{track_id}.jpg"
+                            )
+
+                            snap_path = os.path.join(
+                                SNAPSHOTS_DIR,
+                                snap_name
+                            )
+
+                            cv2.imwrite(
+                                snap_path,
+                                frame
+                            )
+
+                            # Optional ANPR (for loitering, we might not want to do ANPR? The problem doesn't specify. We'll skip ANPR for loitering for now.)
+                            plate_text = None
+
+                            # Create alert record
+                            alert = {
+                                "id": f"{timestamp}_{track_id}",
+                                "type": "loitering",
+                                "object_class": cls_name,
+                                "track_id": track_id,
+                                "confidence": round(confidence, 3),
+                                "timestamp": datetime.now().isoformat(),
+                                "snapshot": snap_name,
+                                "plate_text": plate_text,
+                            }
+
+                            # Save alert to JSON
+                            save_alert(alert)
+
+                            # Terminal alert
+                            print(
+                                f"[ALERT] "
+                                f"{cls_name} "
+                                f"#{track_id} "
+                                f"{'[NIGHT] ' if is_night() else ''}"
+                                f"loitering detected",
+                                flush=True
+                            )
+                else:
+                    # Object is not on the loitering side, reset loitering start time
+                    if track_id in loitering_start_time:
+                        del loitering_start_time[track_id]
+
 
                 # Save current side for the next frame
 
@@ -656,10 +882,17 @@ def main(source, run_anpr_flag, output_path):
                 # FIRE SECURITY ALERT
                 # ===========================================================
 
+                # change 9: Add alert cooldown period check
+                current_time = datetime.now()
+                last_alert_for_track = last_alert_time.get(track_id, datetime.min)
+                time_since_last_alert = (current_time - last_alert_for_track).total_seconds()
+                cooldown_satisfied = time_since_last_alert >= ALERT_COOLDOWN_TIME
+
                 if (
                     crossing_confirm_count.get(track_id, 0)
                     >= ALERT_CONSEC_FRAMES
                     and track_id not in already_alerted
+                    and cooldown_satisfied
                 ):
 
                     # -------------------------------------------------------
@@ -667,6 +900,8 @@ def main(source, run_anpr_flag, output_path):
                     # -------------------------------------------------------
 
                     already_alerted.add(track_id)
+                    # change 9: Update last alert time for cooldown tracking
+                    last_alert_time[track_id] = datetime.now()
 
 
                     # -------------------------------------------------------
@@ -750,8 +985,9 @@ def main(source, run_anpr_flag, output_path):
                         "id":
                             f"{timestamp}_{track_id}",
 
+                        # change 5: Modified alert type to include night movement detection
                         "type":
-                            "virtual_fence_crossing",
+                            "night_movement_crossing" if is_night() else "virtual_fence_crossing",
 
                         "object_class":
                             cls_name,
@@ -793,12 +1029,15 @@ def main(source, run_anpr_flag, output_path):
                         )
 
 
+                    # change 6: Modified print statement to include night indicator
                     print(
                         f"[ALERT] "
                         f"{cls_name} "
                         f"#{track_id} "
+                        f"{'[NIGHT] ' if is_night() else ''}"
                         f"crossed the fence"
-                        f"{plate_message}"
+                        f"{plate_message}",
+                        flush=True
                     )
 
 
@@ -807,7 +1046,6 @@ def main(source, run_anpr_flag, output_path):
         # -------------------------------------------------------------------
 
         if writer is not None:
-
             writer.write(frame)
 
 
