@@ -10,13 +10,17 @@ What this does (in order):
   6. If the object is a vehicle, optionally runs ANPR (plate OCR)
   7. Saves a snapshot image + writes an alert record to alerts.json
   8. Saves an annotated output video for the demo
+  9. Optionally logs all tracked objects for monitoring/debugging
 
 HOW TO RUN:
   python detect_track_fence.py --source ../sample_videos/test.mp4
 
 For ANPR:
   python detect_track_fence.py --source ../sample_videos/test.mp4 --anpr
-[]
+
+To log all tracked objects:
+  python detect_track_fence.py --source ../sample_videos/test.mp4 --track-all
+
 No GPU needed. Runs on CPU.
 """
 
@@ -42,6 +46,8 @@ CAMERA_ID = "CAM_01"
 RESIZE_WIDTH = 640                 # Resize frames for speed
 PROCESS_EVERY_N_FRAMES = 1         # Set to 2 or 3 if video is laggy
 ALERT_CONSEC_FRAMES = 3             # Frames required to confirm crossing
+TRACK_ALL_OBJECTS = False          # Set to True to get alerts for all tracked objects
+TRACK_ALL_FRAMES_INTERVAL = 30     # How often to log all tracked objects (in frames)
 
 # change 1: Added loitering and night movement detection settings
 # Loitering detection settings
@@ -51,6 +57,9 @@ LOITERING_SIDE = 1                 # Side of the fence considered for loitering 
 # Night movement detection settings
 NIGHT_START_HOUR = 19              # Start of night (24-hour format, inclusive)
 NIGHT_END_HOUR = 6                 # End of night (24-hour format, exclusive)
+
+# change 11: Tracking update interval for dashboard
+TRACKING_UPDATE_INTERVAL = 2.0     # Seconds between tracking updates sent to dashboard
 
 # change 7: Added minimum distance threshold for virtual fence crossing
 MIN_CROSS_DISTANCE = 10            # Minimum pixels an object must cross the line to be considered valid
@@ -207,6 +216,20 @@ def save_alert(alert):
             json.dump(alerts, f, indent=2)
 
 
+def send_tracking_data(tracking_info):
+    """
+    Send tracking data to the backend's /api/events endpoint for dashboard display.
+    Falls back to local tracking file if backend is unreachable.
+    """
+    try:
+        response = requests.post(BACKEND_URL, json=tracking_info, timeout=2)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        # Silently fail for tracking data to avoid spamming warnings
+        # Tracking data is less critical than alerts
+        pass
+
+
 # ---------------------------------------------------------------------------
 # VIRTUAL FENCE GEOMETRY
 # ---------------------------------------------------------------------------
@@ -343,7 +366,14 @@ def run_anpr(crop_img):
 # MAIN PIPELINE
 # ---------------------------------------------------------------------------
 
-def main(source, run_anpr_flag, output_path):
+def main(source, run_anpr_flag, output_path, track_all_flag=False):
+    # -----------------------------------------------------------------------
+    # Load YOLO model
+    # -----------------------------------------------------------------------
+
+    # Override config with command line arguments
+    global TRACK_ALL_OBJECTS
+    TRACK_ALL_OBJECTS = track_all_flag
 
     # -----------------------------------------------------------------------
     # Load YOLO model
@@ -405,6 +435,14 @@ def main(source, run_anpr_flag, output_path):
     loitering_start_time = {}
     # track IDs that have already generated a loitering alert
     already_alerted_loitering = set()
+
+    # For tracking all objects (if enabled)
+    # track_id -> last time we logged this object
+    last_track_log_time = {}
+    # Frame counter for periodic logging of all objects
+    frames_since_last_track_log = 0
+    # Last time we sent tracking data to dashboard
+    last_dashboard_tracking_time = {}
 
 # change 9: Alert cooldown tracking
     # track_id -> timestamp of last alert
@@ -592,6 +630,46 @@ def main(source, run_anpr_flag, output_path):
                 # Center point of bounding box
                 cx = (x1 + x2) / 2
                 cy = (y1 + y2) / 2
+
+
+                # -----------------------------------------------------------
+                # Log all tracked objects (if enabled)
+                # -----------------------------------------------------------
+                if TRACK_ALL_OBJECTS:
+                    current_time = datetime.now()
+                    last_logged = last_track_log_time.get(track_id, datetime.min)
+                    time_since_last_log = (current_time - last_logged).total_seconds()
+                    last_dashboard_time = last_dashboard_tracking_time.get(track_id, datetime.min)
+                    time_since_dashboard = (current_time - last_dashboard_time).total_seconds()
+
+                    # Log every TRACK_ALL_FRAMES_INTERVAL frames or every 2 seconds, whichever comes first
+                    if (frame_idx - frames_since_last_track_log) >= TRACK_ALL_FRAMES_INTERVAL or time_since_last_log >= 2.0:
+                        # Format the log message
+                        night_indicator = "[NIGHT] " if is_night() else ""
+                        log_message = f"[TRACK] {night_indicator}{cls_name} #{track_id} conf={confidence:.2f} pos=({cx:.1f},{cy:.1f})"
+                        print(log_message, flush=True)
+                        last_track_log_time[track_id] = current_time
+
+                    # Send tracking data to dashboard every TRACKING_UPDATE_INTERVAL seconds
+                    if time_since_dashboard >= TRACKING_UPDATE_INTERVAL:
+                        tracking_info = {
+                            "camera_id": CAMERA_ID,
+                            "event_type": "tracking_update",
+                            "object_type": cls_name,
+                            "track_id": track_id,
+                            "confidence": round(confidence, 3),
+                            "timestamp": datetime.now().isoformat(),
+                            "position_x": round(cx, 1),
+                            "position_y": round(cy, 1),
+                            "frame_width": RESIZE_WIDTH,
+                            "frame_height": int(RESIZE_WIDTH * h / w),  # Original height scaled
+                            "is_night": is_night()
+                        }
+                        send_tracking_data(tracking_info)
+                        last_dashboard_tracking_time[track_id] = current_time
+
+                # Update frame counter for periodic logging
+                frames_since_last_track_log += 1
 
 
                 # -----------------------------------------------------------
@@ -1112,6 +1190,12 @@ if __name__ == "__main__":
         help="Enable ANPR on vehicle detections"
     )
 
+    parser.add_argument(
+        "--track-all",
+        action="store_true",
+        help="Enable logging of all tracked objects (for debugging/monitoring)"
+    )
+
 
     # IMPORTANT:
     # This now points to the actual snapshots directory
@@ -1138,5 +1222,6 @@ if __name__ == "__main__":
     main(
         args.source,
         args.anpr,
-        args.output
+        args.output,
+        args.track_all
     )
