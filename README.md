@@ -31,6 +31,12 @@ from Pexels or Pixabay.
 
 ## 1. Run the CV pipeline (CV Lead + CV Support start here)
 
+For a MediaMTX RTSP source, publish with fresh keyframes:
+
+```powershell
+ffmpeg -re -stream_loop -1 -i sample_videos/test_4.mp4 -c:v libx264 -preset ultrafast -tune zerolatency -g 30 -keyint_min 30 -sc_threshold 0 -pix_fmt yuv420p -c:a aac -f rtsp rtsp://127.0.0.1:8554/cam1
+```
+
 ```bash
 cd cv_pipeline
 python detect_track_fence.py --source ../sample_videos/test1.mp4 --anpr

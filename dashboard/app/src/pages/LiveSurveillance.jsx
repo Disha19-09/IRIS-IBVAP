@@ -1,6 +1,12 @@
-import { Video, Radio, Users, Car, ShieldAlert,} from "lucide-react";
+import { Radio, Users, Car, ShieldAlert,} from "lucide-react";
+import { useAlerts } from "../api/useAlerts.js";
+import StreamVideo from "../components/StreamVideo.jsx";
 
 function LiveSurveillance() {
+  const { alerts, connected } = useAlerts();
+  const persons = alerts.filter((alert) => alert.object_type === "person").length;
+  const vehicles = alerts.filter((alert) => alert.object_type === "car").length;
+
   return (
     <div className="surveillance-page">
       {/* Page Header */}
@@ -15,7 +21,7 @@ function LiveSurveillance() {
 
         <div className="system-badge">
           <span className="status-dot"></span>
-          CAM-01 ACTIVE
+          {connected ? "CAM-01 ACTIVE" : "BACKEND OFFLINE"}
         </div>
       </div>
 
@@ -41,10 +47,7 @@ function LiveSurveillance() {
             <div className="video-corner bottom-left"></div>
             <div className="video-corner bottom-right"></div>
 
-            <Video size={48} />
-
-            <span>Live surveillance feed</span>
-            <small>Video stream will be connected here</small>
+            <StreamVideo />
 
             <div className="video-overlay-label">
               CAM-01 / RTSP
@@ -78,7 +81,7 @@ function LiveSurveillance() {
               <small>YOLOv8 detection</small>
             </div>
 
-            <strong>—</strong>
+            <strong>{persons}</strong>
           </div>
 
           <div className="detection-item">
@@ -91,7 +94,7 @@ function LiveSurveillance() {
               <small>Vehicle classification</small>
             </div>
 
-            <strong>—</strong>
+            <strong>{vehicles}</strong>
           </div>
 
           <div className="detection-item">
@@ -104,7 +107,7 @@ function LiveSurveillance() {
               <small>Fence / loitering / night</small>
             </div>
 
-            <strong>—</strong>
+            <strong>{alerts.length}</strong>
           </div>
         </div>
       </section>

@@ -1,6 +1,9 @@
 import { Settings as SettingsIcon, Video, SlidersHorizontal, Shield, Clock, Server, } from "lucide-react";
+import { useAlerts } from "../api/useAlerts.js";
 
 function Settings() {
+  const { connected } = useAlerts();
+
   return (
     <div className="settings-page">
       {/* Page Header */}
@@ -186,7 +189,7 @@ function Settings() {
 
           <div>
             <span>BACKEND</span>
-            <strong>—</strong>
+            <strong>{connected ? "CONNECTED" : "OFFLINE"}</strong>
           </div>
         </div>
       </section>

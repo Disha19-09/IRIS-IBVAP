@@ -1,6 +1,11 @@
 import { ScanLine, Car, Camera, Clock, ShieldCheck,} from "lucide-react";
+import { useAlerts } from "../api/useAlerts.js";
 
 function ANPR() {
+  const { alerts } = useAlerts();
+  const plates = alerts.filter((alert) => alert.plate_number);
+  const latestPlate = plates[0];
+
   return (
     <div className="anpr-page">
       {/* Page Header */}
@@ -28,7 +33,7 @@ function ANPR() {
 
           <div>
             <span className="stat-label">PLATES DETECTED</span>
-            <strong>—</strong>
+            <strong>{plates.length}</strong>
             <small>Current session</small>
           </div>
         </div>
@@ -40,7 +45,7 @@ function ANPR() {
 
           <div>
             <span className="stat-label">VEHICLES ANALYZED</span>
-            <strong>—</strong>
+            <strong>{alerts.filter((alert) => alert.object_type === "car").length}</strong>
             <small>AI vehicle detection</small>
           </div>
         </div>
@@ -64,7 +69,7 @@ function ANPR() {
 
           <div>
             <span className="stat-label">RECOGNITION STATUS</span>
-            <strong>—</strong>
+            <strong>{latestPlate ? "READY" : "WAITING"}</strong>
             <small>Waiting for results</small>
           </div>
         </div>
@@ -84,13 +89,15 @@ function ANPR() {
           </div>
 
           <div className="anpr-preview">
-            <Car size={42} />
-
-            <span>No vehicle plate detected</span>
-
-            <small>
-              Recognized number plates will appear here.
-            </small>
+            {latestPlate ? <>
+              <Car size={42} />
+              <span>{latestPlate.plate_number}</span>
+              <small>{new Date(latestPlate.timestamp).toLocaleString()}</small>
+            </> : <>
+              <Car size={42} />
+              <span>No vehicle plate detected</span>
+              <small>Recognized number plates will appear here.</small>
+            </>}
           </div>
         </div>
 
@@ -107,12 +114,8 @@ function ANPR() {
 
           <div className="plate-result-empty">
             <ScanLine size={26} />
-
-            <p>No ANPR result available.</p>
-
-            <span>
-              Plate number and recognition confidence will appear when detected.
-            </span>
+            <p>{latestPlate ? latestPlate.plate_number : "No ANPR result available."}</p>
+            <span>{latestPlate ? `Confidence: ${latestPlate.confidence ?? "unknown"}` : "Plate number and recognition confidence will appear when detected."}</span>
           </div>
         </div>
       </section>
@@ -129,9 +132,7 @@ function ANPR() {
         </div>
 
         <div className="anpr-log-empty">
-          <span>
-            No number plate detections recorded in this session.
-          </span>
+          <span>{plates.length ? `${plates.length} number plate detection${plates.length === 1 ? "" : "s"} recorded.` : "No number plate detections recorded in this session."}</span>
         </div>
       </section>
     </div>

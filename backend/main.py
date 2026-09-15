@@ -34,6 +34,15 @@ SNAPSHOTS_DIR = os.path.join(BASE_DIR, "..", "snapshots")
 app.mount("/snapshots", StaticFiles(directory=SNAPSHOTS_DIR), name="snapshots")
 
 
+@app.middleware("http")
+async def disable_live_data_cache(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/alerts") or request.url.path.startswith("/snapshots/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 @app.get("/")
 def root():
     return {"status": "IRIS IBVAP backend running"}

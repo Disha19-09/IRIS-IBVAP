@@ -1,6 +1,11 @@
 import { ShieldAlert, Clock, Camera, User, Car, MapPin,} from "lucide-react";
+import { useAlerts } from "../api/useAlerts.js";
+import { getEventTypeLabel } from "../api/api.js";
 
 function SecurityEvents() {
+  const { alerts, connected } = useAlerts();
+  const countByType = (type) => alerts.filter((alert) => alert.event_type === type).length;
+
   return (
     <div className="events-page">
       {/* Page Header */}
@@ -15,7 +20,7 @@ function SecurityEvents() {
 
         <div className="system-badge">
           <span className="status-dot"></span>
-          EVENT MONITORING ACTIVE
+          {connected ? "EVENT MONITORING ACTIVE" : "BACKEND OFFLINE"}
         </div>
       </div>
 
@@ -28,7 +33,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">TOTAL EVENTS</span>
-            <strong>—</strong>
+            <strong>{alerts.length}</strong>
             <small>Current session</small>
           </div>
         </div>
@@ -40,7 +45,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">LOITERING</span>
-            <strong>—</strong>
+            <strong>{countByType("loitering")}</strong>
             <small>Detected events</small>
           </div>
         </div>
@@ -52,7 +57,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">FENCE CROSSINGS</span>
-            <strong>—</strong>
+            <strong>{countByType("virtual_fence_crossing")}</strong>
             <small>Virtual fence</small>
           </div>
         </div>
@@ -64,7 +69,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">NIGHT EVENTS</span>
-            <strong>—</strong>
+            <strong>{countByType("night_movement_crossing")}</strong>
             <small>19:00 – 06:00</small>
           </div>
         </div>
@@ -81,16 +86,18 @@ function SecurityEvents() {
           <ShieldAlert size={18} />
         </div>
 
-        <div className="events-empty">
-          <ShieldAlert size={28} />
-
-          <p>No security events recorded.</p>
-
-          <span>
-            AI-detected fence crossings, loitering, and night movement events
-            will appear here.
-          </span>
-        </div>
+        {alerts.length ? alerts.map((alert) => (
+          <div className="pipeline-item" key={alert.id}>
+            <span>{getEventTypeLabel(alert.event_type)} · {alert.object_type || "unknown"}</span>
+            <span className="pipeline-status">{new Date(alert.timestamp).toLocaleTimeString()}</span>
+          </div>
+        )) : (
+          <div className="events-empty">
+            <ShieldAlert size={28} />
+            <p>No security events recorded.</p>
+            <span>AI-detected fence crossings, loitering, and night movement events will appear here.</span>
+          </div>
+        )}
       </section>
 
       {/* Event Types */}

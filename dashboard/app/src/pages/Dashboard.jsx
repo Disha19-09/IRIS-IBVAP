@@ -3,13 +3,19 @@ import {
   Car,
   ShieldAlert,
   Activity,
-  Video,
   Clock,
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
+import { useAlerts } from "../api/useAlerts.js";
+import StreamVideo from "../components/StreamVideo.jsx";
 
 function Dashboard() {
+  const { alerts, connected } = useAlerts();
+  const people = alerts.filter((alert) => alert.object_type === "person").length;
+  const vehicles = alerts.filter((alert) => alert.object_type === "car").length;
+  const activeTracks = new Set(alerts.map((alert) => alert.track_id).filter(Boolean)).size;
+
   return (
     <div className="dashboard">
       {/* Page Header */}
@@ -37,7 +43,7 @@ function Dashboard() {
 
           <div>
             <span className="stat-label">PERSONS DETECTED</span>
-            <strong>—</strong>
+            <strong>{people}</strong>
             <small>Live stream</small>
           </div>
         </div>
@@ -49,7 +55,7 @@ function Dashboard() {
 
           <div>
             <span className="stat-label">VEHICLES DETECTED</span>
-            <strong>—</strong>
+            <strong>{vehicles}</strong>
             <small>Live stream</small>
           </div>
         </div>
@@ -61,7 +67,7 @@ function Dashboard() {
 
           <div>
             <span className="stat-label">ACTIVE TRACKS</span>
-            <strong>—</strong>
+            <strong>{activeTracks}</strong>
             <small>ByteTrack</small>
           </div>
         </div>
@@ -73,7 +79,7 @@ function Dashboard() {
 
           <div>
             <span className="stat-label">SECURITY EVENTS</span>
-            <strong>—</strong>
+            <strong>{alerts.length}</strong>
             <small>Current session</small>
           </div>
         </div>
@@ -91,14 +97,12 @@ function Dashboard() {
 
             <div className="live-status">
               <span className="status-dot"></span>
-              RTSP LIVE
+              {connected ? "BACKEND LIVE" : "BACKEND OFFLINE"}
             </div>
           </div>
 
           <div className="video-placeholder">
-            <Video size={42} />
-            <span>Live surveillance feed</span>
-            <small>Video stream will be connected here</small>
+            <StreamVideo />
           </div>
 
           <div className="video-footer">
@@ -119,13 +123,18 @@ function Dashboard() {
             <AlertTriangle size={18} />
           </div>
 
-          <div className="empty-state">
-            <CheckCircle2 size={26} />
-            <p>No active alerts</p>
-            <span>
-              Real-time events will appear here when detected.
-            </span>
-          </div>
+          {alerts.length ? alerts.slice(0, 4).map((alert) => (
+            <div className="pipeline-item" key={alert.id}>
+              <span>{alert.event_type || "Security event"}</span>
+              <span className="pipeline-status">{alert.object_type || "unknown"}</span>
+            </div>
+          )) : (
+            <div className="empty-state">
+              <CheckCircle2 size={26} />
+              <p>No active alerts</p>
+              <span>Real-time events will appear here when detected.</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -143,7 +152,7 @@ function Dashboard() {
           </div>
 
           <div className="event-empty">
-            <span>No events recorded in this session.</span>
+            <span>{alerts.length ? `${alerts.length} event${alerts.length === 1 ? "" : "s"} recorded.` : "No events recorded in this session."}</span>
           </div>
         </div>
 

@@ -1,6 +1,9 @@
 import { Radio, CheckCircle2, Server, Cpu } from "lucide-react";
+import { useAlerts } from "../api/useAlerts.js";
 
 function Topbar() {
+  const { connected } = useAlerts();
+
   return (
     <header className="topbar">
       <div className="topbar-section">
@@ -25,7 +28,7 @@ function Topbar() {
         <div className="status-item connected">
           <Server size={13} />
           <span>FASTAPI</span>
-          <span className="status-sub">CONNECTED</span>
+          <span className="status-sub">{connected ? "CONNECTED" : "OFFLINE"}</span>
         </div>
 
         <div className="status-item pipeline">

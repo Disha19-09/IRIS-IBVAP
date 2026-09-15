@@ -388,7 +388,10 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
     # Open video
     # -----------------------------------------------------------------------
 
-    cap = cv2.VideoCapture(source)
+    if isinstance(source, str) and source.lower().startswith("rtsp://"):
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+
+    cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
 
     if not cap.isOpened():
 
@@ -659,8 +662,8 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
                             "track_id": track_id,
                             "confidence": round(confidence, 3),
                             "timestamp": datetime.now().isoformat(),
-                            "position_x": round(cx, 1),
-                            "position_y": round(cy, 1),
+                            "position_x": float(cx),
+                            "position_y": float(cy),
                             "frame_width": RESIZE_WIDTH,
                             "frame_height": int(RESIZE_WIDTH * h / w),  # Original height scaled
                             "is_night": is_night()
@@ -898,7 +901,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
                             already_alerted_loitering.add(track_id)
                             # Create loitering alert (similar to crossing alert)
                             # Timestamp
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
                             # Save evidence snapshot
                             snap_name = (
@@ -986,7 +989,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
                     # -------------------------------------------------------
 
                     timestamp = datetime.now().strftime(
-                        "%Y%m%d_%H%M%S"
+                        "%Y%m%d_%H%M%S_%f"
                     )
 
 
