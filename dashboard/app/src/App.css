@@ -460,12 +460,10 @@
 
 .stat-label {
   margin-bottom: 5px;
-
   font-family: "JetBrains Mono", monospace;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.8px;
-
   color: #697784;
 }
 
@@ -757,16 +755,12 @@
 
 .pipeline-item {
   min-height: 42px;
-
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   padding: 0 16px;
-
   border-bottom: 1px solid #151e26;
-
-  font-size: 11px;
+  font-size: 13px;
   color: #82909b;
 }
 

@@ -4,8 +4,8 @@ import { getEventTypeLabel } from "../api/api.js";
 
 function SecurityEvents() {
   const { alerts, connected } = useAlerts();
-  const countByType = (type) => alerts.filter((alert) => alert.event_type === type).length;
-
+  const countByType = (types) => alerts.filter((alert) => types.includes(alert.event_type)).length;
+  const securityEvents = alerts.filter((alert) => alert.event_type !== "tracking_update");
   return (
     <div className="events-page">
       {/* Page Header */}
@@ -33,7 +33,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">TOTAL EVENTS</span>
-            <strong>{alerts.length}</strong>
+            <strong>{securityEvents.length}</strong>
             <small>Current session</small>
           </div>
         </div>
@@ -45,7 +45,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">LOITERING</span>
-            <strong>{countByType("loitering")}</strong>
+            <strong>{countByType(["loitering", "night_loitering"])}</strong>
             <small>Detected events</small>
           </div>
         </div>
@@ -57,7 +57,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">FENCE CROSSINGS</span>
-            <strong>{countByType("virtual_fence_crossing")}</strong>
+            <strong>{countByType(["virtual_fence_crossing", "night_movement_crossing"])}</strong>
             <small>Virtual fence</small>
           </div>
         </div>
@@ -69,7 +69,7 @@ function SecurityEvents() {
 
           <div>
             <span className="stat-label">NIGHT EVENTS</span>
-            <strong>{countByType("night_movement_crossing")}</strong>
+            <strong>{countByType(["night_movement_crossing", "night_loitering"])}</strong>
             <small>19:00 – 06:00</small>
           </div>
         </div>
@@ -86,7 +86,7 @@ function SecurityEvents() {
           <ShieldAlert size={18} />
         </div>
 
-        {alerts.length ? alerts.map((alert) => (
+        {securityEvents.length ? securityEvents.map((alert) => (
           <div className="pipeline-item" key={alert.id}>
             <span>{getEventTypeLabel(alert.event_type)} · {alert.object_type || "unknown"}</span>
             <span className="pipeline-status">{new Date(alert.timestamp).toLocaleTimeString()}</span>

@@ -8,6 +8,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAlerts } from "../api/useAlerts.js";
+import { getEventTypeLabel } from "../api/api.js";
 import StreamVideo from "../components/StreamVideo.jsx";
 
 function Dashboard() {
@@ -15,7 +16,7 @@ function Dashboard() {
   const people = alerts.filter((alert) => alert.object_type === "person").length;
   const vehicles = alerts.filter((alert) => alert.object_type === "car").length;
   const activeTracks = new Set(alerts.map((alert) => alert.track_id).filter(Boolean)).size;
-
+  const securityEvents = alerts.filter((alert) => alert.event_type !== "tracking_update");
   return (
     <div className="dashboard">
       {/* Page Header */}
@@ -42,7 +43,7 @@ function Dashboard() {
           </div>
 
           <div>
-            <span className="stat-label">PERSONS DETECTED</span>
+            <span className="stat-label">PERSONS EVENTS</span>
             <strong>{people}</strong>
             <small>Live stream</small>
           </div>
@@ -54,7 +55,7 @@ function Dashboard() {
           </div>
 
           <div>
-            <span className="stat-label">VEHICLES DETECTED</span>
+            <span className="stat-label">VEHICLES EVENTS</span>
             <strong>{vehicles}</strong>
             <small>Live stream</small>
           </div>
@@ -66,9 +67,9 @@ function Dashboard() {
           </div>
 
           <div>
-            <span className="stat-label">ACTIVE TRACKS</span>
+            <span className="stat-label">TRACKED OBJECTS</span>
             <strong>{activeTracks}</strong>
-            <small>ByteTrack</small>
+            <small>ByteTrack </small>
           </div>
         </div>
 
@@ -79,7 +80,7 @@ function Dashboard() {
 
           <div>
             <span className="stat-label">SECURITY EVENTS</span>
-            <strong>{alerts.length}</strong>
+            <strong>{securityEvents.length}</strong>
             <small>Current session</small>
           </div>
         </div>
@@ -125,7 +126,7 @@ function Dashboard() {
 
           {alerts.length ? alerts.slice(0, 4).map((alert) => (
             <div className="pipeline-item" key={alert.id}>
-              <span>{alert.event_type || "Security event"}</span>
+              <span>{getEventTypeLabel(alert.event_type) || "Security event"}</span>
               <span className="pipeline-status">{alert.object_type || "unknown"}</span>
             </div>
           )) : (
