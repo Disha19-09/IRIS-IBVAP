@@ -27,6 +27,8 @@ No GPU needed. Runs on CPU.
 import argparse
 import json
 import os
+import threading
+import time
 from datetime import datetime
 import csv
 import requests
@@ -200,20 +202,41 @@ def load_alerts():
 
 def save_alert(alert):
     """
-    Send the alert to the backend's /api/events endpoint so it gets
-    persisted to the database and broadcast over WebSocket.
-    Falls back to a local JSON file if the backend is unreachable,
-    so you don't lose alerts if the backend crashes mid-demo.
+    Send the alert to the backend in a background thread so
+    the video-processing loop does not wait for the HTTP request.
+
+    Falls back to a local JSON file if the backend is unreachable.
     """
-    try:
-        response = requests.post(BACKEND_URL, json=alert, timeout=2)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"[WARN] Backend unreachable, saving locally instead: {e}")
-        alerts = load_alerts()
-        alerts.append(alert)
-        with open(ALERTS_JSON_PATH, "w", encoding="utf-8") as f:
-            json.dump(alerts, f, indent=2)
+
+    def _send():
+        try:
+            response = requests.post(
+                BACKEND_URL,
+                json=alert,
+                timeout=2
+            )
+            response.raise_for_status()
+
+        except requests.exceptions.RequestException as e:
+            print(
+                f"[WARN] Backend unreachable, saving locally instead: {e}",
+                flush=True
+            )
+
+            alerts = load_alerts()
+            alerts.append(alert)
+
+            with open(
+                ALERTS_JSON_PATH,
+                "w",
+                encoding="utf-8"
+            ) as f:
+                json.dump(alerts, f, indent=2)
+
+    threading.Thread(
+        target=_send,
+        daemon=True
+    ).start()
 
 
 def send_tracking_data(tracking_info):
@@ -263,7 +286,7 @@ def distance_from_point_to_line(point, line_start, line_end):
     x2, y2 = line_end
 
     # Calculate the area of the parallelogram formed by the points
-    area = abs((x2 - x1) * (y1 - y) - (x1 - x) * (y2 - y1))
+    area = (x2 - x1) * (y1 - y) - (x1 - x) * (y2 - y1)
 
     # Calculate the length of the line segment
     line_length = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
@@ -365,6 +388,62 @@ def run_anpr(crop_img):
 # ---------------------------------------------------------------------------
 # MAIN PIPELINE
 # ---------------------------------------------------------------------------
+def is_rtsp(source):
+    return (
+        isinstance(source, str)
+        and source.lower().startswith("rtsp://")
+    )
+
+
+class LatestFrameCapture:
+    def __init__(self, source):
+        self.source = source
+        self.cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+
+        if is_rtsp(source):
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        self.latest_frame = None
+        self.running = False
+        self.thread = None
+        self.lock = threading.Lock()
+
+    def start(self):
+        self.running = True
+
+        self.thread = threading.Thread(
+            target=self._capture_loop,
+            daemon=True
+        )
+
+        self.thread.start()
+
+        return self
+
+    def _capture_loop(self):
+        while self.running:
+            ret, frame = self.cap.read()
+
+            if ret:
+                with self.lock:
+                    self.latest_frame = frame
+            else:
+                time.sleep(0.05)
+
+    def read(self):
+        with self.lock:
+            if self.latest_frame is None:
+                return None
+
+            return self.latest_frame.copy()
+
+    def stop(self):
+        self.running = False
+
+        if self.thread is not None:
+            self.thread.join(timeout=1)
+
+        self.cap.release()
 
 def main(source, run_anpr_flag, output_path, track_all_flag=False):
     # -----------------------------------------------------------------------
@@ -388,22 +467,37 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
     # Open video
     # -----------------------------------------------------------------------
 
-    if isinstance(source, str) and source.lower().startswith("rtsp://"):
+    rtsp_mode = is_rtsp(source)
+
+    if rtsp_mode:
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 
-    cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+        latest_capture = LatestFrameCapture(source).start()
 
-    if not cap.isOpened():
+        # Give the capture thread a moment to receive the first frame.
+        time.sleep(0.5)
 
-        print(
-            f"[ERROR] Could not open video source: {source}"
-        )
+        if not latest_capture.cap.isOpened():
+            print(
+                f"[ERROR] Could not open RTSP source: {source}"
+            )
+            latest_capture.stop()
+            return
 
-        return
+        fps = latest_capture.cap.get(cv2.CAP_PROP_FPS) or 20
 
+    else:
+        latest_capture = None
 
-    # Get original video FPS
-    fps = cap.get(cv2.CAP_PROP_FPS) or 20
+        cap = cv2.VideoCapture(source)
+
+        if not cap.isOpened():
+            print(
+                f"[ERROR] Could not open video source: {source}"
+            )
+            return
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 20
 
 
     # Video writer will be initialized after the first frame
@@ -477,14 +571,30 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
     # YOLO detection + tracking
     # -----------------------------------------------------------------------
 
-    for result in model.track(
-        source=source,
-        conf=CONF_THRESHOLD,
-        persist=True,
-        tracker="bytetrack.yaml",
-        stream=True,
-        verbose=False,
-    ):
+    while True:
+
+        if rtsp_mode:
+            frame = latest_capture.read()
+
+            if frame is None:
+                time.sleep(0.01)
+                continue
+
+        else:
+            ret, frame = cap.read()
+
+            if not ret:
+                break
+
+        results = model.track(
+            source=frame,
+            conf=CONF_THRESHOLD,
+            persist=True,
+            tracker="bytetrack.yaml",
+            verbose=False,
+        )
+
+        result = results[0]
 
         frame_idx += 1
 
@@ -776,116 +886,63 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
                 # -----------------------------------------------------------
                 # Detect initial crossing
                 # -----------------------------------------------------------
-
-                # change 10: Improved side determination with hysteresis
-                # Calculate distance from line for hysteresis-based side determination
                 distance_from_line = distance_from_point_to_line(
-                    (cx, cy), LINE_START, LINE_END
+                    (cx, cy),
+                    LINE_START,
+                    LINE_END
                 )
+                # -----------------------------------------------------------
+                # Virtual fence crossing detection
+                # -----------------------------------------------------------
 
-                # Apply hysteresis: only consider crossing if object has moved
-                # sufficiently past the line (reduces jitter near boundary)
-                effective_sign = 0
+                # Get the previous confirmed side of this tracked object.
+                prev_sign = last_side.get(track_id, 0)
+
+                # Determine the current side using hysteresis.
                 if distance_from_line > SIDE_HYSTERESIS:
                     effective_sign = 1
                 elif distance_from_line < -SIDE_HYSTERESIS:
                     effective_sign = -1
-                # If within hysteresis zone, maintain previous sign to avoid jitter
-                elif prev_sign is not None:
+                else:
                     effective_sign = prev_sign
 
-                prev_sign = last_side.get(track_id, 0)  # Default to 0 if no previous side
 
+                # Detect a change from one side of the fence to the other.
                 if (
-                    prev_sign is not None
-                    and prev_sign != 0
+                    prev_sign != 0
                     and effective_sign != 0
                     and effective_sign != prev_sign
                 ):
-                    # Object changed sides with hysteresis applied.
-                    #
-                    # This is the first frame of the potential crossing.
 
-                    # change 7: Add minimum distance threshold to reduce false positives
-                    # Only consider crossing valid if object has moved sufficient distance
-                    if distance_from_line >= MIN_CROSS_DISTANCE or distance_from_line <= -MIN_CROSS_DISTANCE:
-                        crossing_confirm_count[track_id] = 1
-                        crossing_direction[track_id] = effective_sign
-
-                        # change 8: For hysteresis - track initial crossing point distance
-                        # Store the distance from line when crossing was first detected
-                        crossing_initial_distance[track_id] = distance_from_line
+                    # Start confirmation for a possible crossing.
+                    crossing_confirm_count[track_id] = 1
+                    crossing_direction[track_id] = effective_sign
 
 
-                # -----------------------------------------------------------
-                # Confirm crossing
-                # -----------------------------------------------------------
-
+                # Continue confirming an already detected crossing.
                 elif (
                     track_id in crossing_confirm_count
                     and crossing_confirm_count[track_id] > 0
                 ):
 
-                    # The object already crossed.
-                    # Check whether it remains on the new side.
+                    expected_side = crossing_direction.get(track_id)
 
-                    # change 10: Apply hysteresis to current sign as well for consistency
-                    distance_from_line_current = distance_from_point_to_line(
-                        (cx, cy), LINE_START, LINE_END
-                    )
-
-                    effective_current_sign = 0
-                    if distance_from_line_current > SIDE_HYSTERESIS:
-                        effective_current_sign = 1
-                    elif distance_from_line_current < -SIDE_HYSTERESIS:
-                        effective_current_sign = -1
-                    # If within hysteresis zone, maintain previous effective sign to avoid jitter
-                    elif prev_sign is not None:
-                        effective_current_sign = prev_sign
-
-                    # change 8: Enhanced confirmation logic with directional consistency
-                    # Check not just side consistency but also that movement is away from line
-                    is_on_expected_side = (
-                        effective_current_sign == crossing_direction.get(track_id)
-                    )
-
-                    # change 7: Additional distance check - object should continue to move away
-                    # from the line or at least not move back significantly
-                    initial_distance = crossing_initial_distance.get(track_id, 0)
-                    distance_change = distance_from_line_current - initial_distance
-
-                    # Object is considered still crossing if:
-                    # 1. It's on the expected side (with hysteresis)
-                    # 2. It has not moved back past the initial crossing point by more than hysteresis threshold
-                    is_consistent_movement = is_on_expected_side and distance_change > -SIDE_HYSTERESIS
-
-                    if is_consistent_movement:
-
+                    if effective_sign == expected_side:
                         crossing_confirm_count[track_id] += 1
-
                     else:
-
-                        # Object did not remain on the new side or moved back.
-                        # Treat it as a false crossing.
-
+                        # Side changed back before confirmation.
                         crossing_confirm_count[track_id] = 0
-
-                        crossing_direction.pop(
-                            track_id,
-                            None
-                        )
-
-                        crossing_initial_distance.pop(
-                            track_id,
-                            None
-                        )
+                        crossing_direction.pop(track_id, None)
 
 
                 else:
 
-                    # No crossing currently happening.
-
                     crossing_confirm_count[track_id] = 0
+
+
+                # Save the hysteresis-filtered side for the next frame.
+                if effective_sign != 0:
+                    last_side[track_id] = effective_sign
 
                 # change 4: Added loitering detection logic
                 # Loitering detection
@@ -952,10 +1009,9 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
                     if track_id in loitering_start_time:
                         del loitering_start_time[track_id]
 
-
                 # Save current side for the next frame
 
-                last_side[track_id] = current_sign
+                last_side[track_id] = effective_sign
 
 
                 # ===========================================================
@@ -1153,7 +1209,10 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
     # Cleanup
     # -----------------------------------------------------------------------
 
-    cap.release()
+    if rtsp_mode:
+        latest_capture.stop()
+    else:
+        cap.release()
 
 
     if writer is not None:
