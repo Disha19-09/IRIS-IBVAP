@@ -43,7 +43,7 @@ from ultralytics import YOLO
 
 MODEL_PATH = "yolov8n.pt"          # Nano model -> fastest on CPU
 CONF_THRESHOLD = 0.4               # Detection confidence cutoff
-BACKEND_URL = "http://localhost:8000/api/events"
+BACKEND_URL = "http://localhost:8000/api/events/public"  # Public endpoint (no auth required)
 CAMERA_ID = "CAM_01"
 RESIZE_WIDTH = 640                 # Resize frames for speed
 PROCESS_EVERY_N_FRAMES = 1         # Set to 2 or 3 if video is laggy
