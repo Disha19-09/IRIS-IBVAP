@@ -1,0 +1,45 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                   IRIS-IBVAP Quick Start                      ║
+╚═══════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 1: Start the System                                     │
+└───────────────────────────────────────────────────────────────┘
+
+Double-click:  START.bat
+
+This will:
+  ✓ Check and install auth dependencies (if needed)
+  ✓ Start MediaMTX (video streaming server)
+  ✓ Start FFmpeg (video publisher)
+  ✓ Start Backend API (port 8000)
+  ✓ Start Dashboard (port 5173)
+  ✓ Start CV Pipeline (detection & tracking)
+
+Wait about 30 seconds for all services to start.
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 2: Open Dashboard                                       │
+└───────────────────────────────────────────────────────────────┘
+
+Open browser: http://127.0.0.1:5173/
+
+Login:
+  Username: admin
+  Password: admin123
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 3: Stop the System                                      │
+└───────────────────────────────────────────────────────────────┘
+
+Double-click:  STOP_ALL.bat
+
+This stops all services cleanly.
+
+═══════════════════════════════════════════════════════════════
+
+That's it! Just two files:
+  • START.bat  - Starts everything
+  • STOP_ALL.bat - Stops everything
+
+═══════════════════════════════════════════════════════════════

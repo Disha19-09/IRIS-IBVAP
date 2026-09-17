@@ -43,12 +43,12 @@ from ultralytics import YOLO
 # ---------------------------------------------------------------------------
 
 MODEL_PATH = "yolov8n.pt"          # Nano model -> fastest on CPU
-CONF_THRESHOLD = 0.4               # Detection confidence cutoff
+CONF_THRESHOLD = 0.5               # Detection confidence cutoff (increased to reduce false detections)
 BACKEND_URL = "http://localhost:8000/api/events/public"  # Public endpoint (no auth required)
 CAMERA_ID = "CAM_01"
 RESIZE_WIDTH = 640                 # Resize frames for speed
-PROCESS_EVERY_N_FRAMES = 1         # Set to 2 or 3 if video is laggy
-ALERT_CONSEC_FRAMES = 3             # Frames required to confirm crossing
+PROCESS_EVERY_N_FRAMES = 5         # Process every 3rd frame for better performance
+ALERT_CONSEC_FRAMES = 2            # Reduced since we're processing fewer frames
 TRACK_ALL_OBJECTS = False          # Set to True to get alerts for all tracked objects
 TRACK_ALL_FRAMES_INTERVAL = 30     # How often to log all tracked objects (in frames)
 
@@ -485,7 +485,7 @@ def start_annotated_rtsp_publisher(width, height, fps):
         return None
 
 
-def main(source, run_anpr_flag, output_path, track_all_flag=False):
+def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=False):
     # -----------------------------------------------------------------------
     # Load YOLO model
     # -----------------------------------------------------------------------
@@ -529,7 +529,12 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
     else:
         latest_capture = None
 
-        cap = cv2.VideoCapture(source)
+        cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+        
+        # Set RTSP-specific options for better stability
+        if is_rtsp(source):
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)
+            cap.set(cv2.CAP_PROP_FPS, 30)
 
         if not cap.isOpened():
             print(
@@ -1244,20 +1249,21 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
         # Display live detection window
         # -------------------------------------------------------------------
 
-        cv2.imshow(
-            "IRIS - IBVAP Demo",
-            frame
-        )
-
-
-        # Press Q to stop
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-
-            print(
-                "[INFO] Pipeline stopped by user."
+        if not no_display:
+            cv2.imshow(
+                "IRIS - IBVAP Demo",
+                frame
             )
 
-            break
+
+            # Press Q to stop
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+
+                print(
+                    "[INFO] Pipeline stopped by user."
+                )
+
+                break
 
 
     # -----------------------------------------------------------------------
@@ -1340,6 +1346,12 @@ if __name__ == "__main__":
         help="Enable logging of all tracked objects (for debugging/monitoring)"
     )
 
+    parser.add_argument(
+        "--no-display",
+        action="store_true",
+        help="Disable live video display window (recommended for performance)"
+    )
+
 
     # IMPORTANT:
     # This now points to the actual snapshots directory
@@ -1367,5 +1379,6 @@ if __name__ == "__main__":
         args.source,
         args.anpr,
         args.output,
-        args.track_all
+        args.track_all,
+        args.no_display
     )
