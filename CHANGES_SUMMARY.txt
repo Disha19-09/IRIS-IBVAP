@@ -1,0 +1,60 @@
+═══════════════════════════════════════════════════════════════
+  IRIS-IBVAP Changes Summary
+═══════════════════════════════════════════════════════════════
+
+✅ Database Changes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Deleted alerts.db (will be auto-created on first run)
+• Removed alerts.db from git tracking
+• Added to .gitignore:
+  - backend/alerts.db
+  - backend/alerts.csv
+
+✅ Startup Scripts Simplified
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Consolidated everything into 2 files:
+
+  START.bat       → Starts everything (checks deps, starts all services)
+  STOP_ALL.bat    → Stops everything
+
+Removed 8 redundant batch files:
+  - start_1_mediamtx.bat
+  - start_2_ffmpeg_publisher.bat
+  - start_2_ffmpeg_publisher_FAST.bat
+  - start_2_ffmpeg_publisher_HQ.bat
+  - start_3_backend.bat
+  - start_4_dashboard.bat
+  - start_5_cv_pipeline.bat
+  - install_auth_deps.bat
+  - PERFORMANCE_MODE.bat
+  - RESTART_SYSTEM.bat
+  - QUICK_FIX.bat
+  - START_ALL.bat
+  - CHECK_PERFORMANCE.bat
+  - test_streaming.bat
+
+✅ Performance Optimizations
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• CV Pipeline: Process every 3rd frame (not every frame)
+• Video Stream: 480p @ 15fps, 1000k bitrate (optimized)
+• Detection confidence: Increased to 0.5 (fewer false positives)
+• RTSP handling: Added CAP_FFMPEG for better stability
+
+✅ Git Status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ready to commit:
+  M  .gitignore        (added database files)
+  D  backend/alerts.db (removed from tracking)
+
+═══════════════════════════════════════════════════════════════
+  How to Use
+═══════════════════════════════════════════════════════════════
+
+1. Double-click START.bat
+2. Wait 30 seconds
+3. Open http://127.0.0.1:5173/
+4. Login: admin / admin123
+
+To stop: Double-click STOP_ALL.bat
+
+═══════════════════════════════════════════════════════════════
