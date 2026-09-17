@@ -11,8 +11,10 @@ venv/
 *.pt
 *.onnx
 
-# Generated alerts
+# Generated alerts and database
 backend/alerts.json
+backend/alerts.db
+backend/alerts.csv
 
 # Generated snapshots
 snapshots/*.jpg
