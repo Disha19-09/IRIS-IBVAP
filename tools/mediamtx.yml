@@ -877,6 +877,12 @@ pathDefaults:
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
 paths:
+  cam1:
+    source: publisher
+
+  cam1_processed:
+    source: publisher
+
   # example:
   # my_camera:
   #   source: rtsp://my_camera

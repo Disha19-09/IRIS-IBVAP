@@ -1,4 +1,7 @@
-const WEBRTC_URL = import.meta.env.VITE_WEBRTC_URL || "http://127.0.0.1:8889/cam1/?autoplay=yes&muted=yes&controls=no";
+const WEBRTC_URL =
+  import.meta.env.VITE_WEBRTC_URL ||
+  import.meta.env.VITE_PROCESSED_STREAM_URL ||
+  "http://127.0.0.1:8889/cam1_processed/?autoplay=yes&muted=yes&controls=no";
 
 function StreamVideo({ className = "" }) {
   return (

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar.jsx";
 import Topbar from "./components/Topbar.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
 import LiveSurveillance from "./pages/LiveSurveillance.jsx";
@@ -9,30 +10,130 @@ import SecurityEvents from "./pages/SecurityEvents.jsx";
 import ANPR from "./pages/ANPR.jsx";
 import Evidence from "./pages/Evidence.jsx";
 import Settings from "./pages/Settings.jsx";
+import Login from "./pages/Login.jsx";
 
 import "./App.css";
 
 function App() {
   return (
     <BrowserRouter>
-      <div className="app">
-        <Sidebar />
+      <Routes>
+        <Route path="/login" element={<Login />} />
 
-        <div className="content-area">
-          <Topbar />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <div className="app">
+                <Sidebar />
 
-          <main className="main-content">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/live" element={<LiveSurveillance />} />
-              <Route path="/events" element={<SecurityEvents />} />
-              <Route path="/anpr" element={<ANPR />} />
-              <Route path="/evidence" element={<Evidence />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
+                <div className="content-area">
+                  <Topbar />
+
+                  <main className="main-content">
+                    <Dashboard />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/live"
+          element={
+            <ProtectedRoute>
+              <div className="app">
+                <Sidebar />
+
+                <div className="content-area">
+                  <Topbar />
+
+                  <main className="main-content">
+                    <LiveSurveillance />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute>
+              <div className="app">
+                <Sidebar />
+
+                <div className="content-area">
+                  <Topbar />
+
+                  <main className="main-content">
+                    <SecurityEvents />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/anpr"
+          element={
+            <ProtectedRoute>
+              <div className="app">
+                <Sidebar />
+
+                <div className="content-area">
+                  <Topbar />
+
+                  <main className="main-content">
+                    <ANPR />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/evidence"
+          element={
+            <ProtectedRoute>
+              <div className="app">
+                <Sidebar />
+
+                <div className="content-area">
+                  <Topbar />
+
+                  <main className="main-content">
+                    <Evidence />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <div className="app">
+                <Sidebar />
+
+                <div className="content-area">
+                  <Topbar />
+
+                  <main className="main-content">
+                    <Settings />
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

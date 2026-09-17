@@ -95,7 +95,7 @@ function SecurityEvents() {
           <div className="events-empty">
             <ShieldAlert size={28} />
             <p>No security events recorded.</p>
-            <span>AI-detected fence crossings, loitering, and night movement events will appear here.</span>
+            <span>AI-detected fence crossings, loitering, and person movement events will appear here.</span>
           </div>
         )}
       </section>
@@ -138,7 +138,7 @@ function SecurityEvents() {
 
           <div>
             <span className="panel-kicker">EVENT TYPE</span>
-            <h3>Night Movement</h3>
+            <h3>Person Movement</h3>
             <p>
               Fence-crossing activity detected during the configured night
               period.

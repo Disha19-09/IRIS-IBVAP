@@ -1,8 +1,16 @@
 import { Radio, CheckCircle2, Server, Cpu } from "lucide-react";
 import { useAlerts } from "../api/useAlerts.js";
+import { clearAuthToken } from "../api/api.js";
+import { useNavigate } from "react-router-dom";
 
 function Topbar() {
   const { connected } = useAlerts();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    clearAuthToken();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <header className="topbar">
@@ -41,6 +49,9 @@ function Topbar() {
       <div className="topbar-session">
         <span className="session-label">IBVAP</span>
         <span className="session-status">ACTIVE SESSION</span>
+        <button type="button" className="logout-button" onClick={handleLogout}>
+          Sign out
+        </button>
       </div>
     </header>
   );

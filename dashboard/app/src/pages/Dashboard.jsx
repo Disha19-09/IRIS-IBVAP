@@ -17,6 +17,17 @@ function Dashboard() {
   const vehicles = alerts.filter((alert) => alert.object_type === "car").length;
   const activeTracks = new Set(alerts.map((alert) => alert.track_id).filter(Boolean)).size;
   const securityEvents = alerts.filter((alert) => alert.event_type !== "tracking_update");
+  const activeAlerts = securityEvents.filter((alert) => {
+    const timestamp = new Date(alert.timestamp).getTime();
+    return Number.isFinite(timestamp) && Date.now() - timestamp <= 60 * 1000;
+  });
+
+  function formatAlertTime(timestamp) {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) return "TIME UNKNOWN";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
   return (
     <div className="dashboard">
       {/* Page Header */}
@@ -117,23 +128,26 @@ function Dashboard() {
         <div className="panel alerts-panel">
           <div className="panel-header">
             <div>
-              <span className="panel-kicker">SECURITY EVENTS</span>
+              <span className="panel-kicker">LIVE SECURITY EVENTS</span>
               <h2>Active Alerts</h2>
             </div>
 
             <AlertTriangle size={18} />
           </div>
 
-          {alerts.length ? alerts.slice(0, 4).map((alert) => (
-            <div className="pipeline-item" key={alert.id}>
-              <span>{getEventTypeLabel(alert.event_type) || "Security event"}</span>
-              <span className="pipeline-status">{alert.object_type || "unknown"}</span>
+          {activeAlerts.length ? activeAlerts.slice(0, 4).map((alert) => (
+            <div className="pipeline-item" key={alert.id ?? `${alert.timestamp}-${alert.track_id}`}>
+              <span>
+                {getEventTypeLabel(alert.event_type) || "Security event"}
+                <small className="alert-time">{formatAlertTime(alert.timestamp)}</small>
+              </span>
+              <span className="pipeline-status">{alert.object_type || "unknown"} · #{alert.track_id ?? "n/a"}</span>
             </div>
           )) : (
             <div className="empty-state">
               <CheckCircle2 size={26} />
-              <p>No active alerts</p>
-              <span>Real-time events will appear here when detected.</span>
+              <p>No live alerts</p>
+              <span>New events will appear here for 60 seconds.</span>
             </div>
           )}
         </div>

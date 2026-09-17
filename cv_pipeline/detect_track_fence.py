@@ -27,6 +27,7 @@ No GPU needed. Runs on CPU.
 import argparse
 import json
 import os
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -107,6 +108,9 @@ VEHICLE_CLASSES = {
 
 # Get the directory containing this Python file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TOOLS_DIR = os.path.join(BASE_DIR, "..", "tools")
+FFMPEG_PATH = os.path.join(TOOLS_DIR, "ffmpeg.exe")
+ANNOTATED_RTSP_URL = "rtsp://127.0.0.1:8554/cam1_processed"
 
 # D:\IRIS\iris_ibvap\backend\alerts.json
 ALERTS_JSON_PATH = os.path.join(
@@ -445,6 +449,42 @@ class LatestFrameCapture:
 
         self.cap.release()
 
+def start_annotated_rtsp_publisher(width, height, fps):
+    """Stream annotated frames to MediaMTX as a live RTSP feed for the dashboard."""
+    ffmpeg_bin = FFMPEG_PATH if os.path.exists(FFMPEG_PATH) else "ffmpeg"
+    command = [
+        ffmpeg_bin,
+        "-y",
+        "-f", "rawvideo",
+        "-pix_fmt", "bgr24",
+        "-s", f"{width}x{height}",
+        "-r", str(fps),
+        "-i", "-",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-tune", "zerolatency",
+        "-g", "30",
+        "-keyint_min", "30",
+        "-sc_threshold", "0",
+        "-pix_fmt", "yuv420p",
+        "-an",
+        "-f", "rtsp",
+        ANNOTATED_RTSP_URL,
+    ]
+
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return process
+    except Exception as exc:
+        print(f"[WARN] Could not start annotated RTSP publisher: {exc}")
+        return None
+
+
 def main(source, run_anpr_flag, output_path, track_all_flag=False):
     # -----------------------------------------------------------------------
     # Load YOLO model
@@ -502,6 +542,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
 
     # Video writer will be initialized after the first frame
     writer = None
+    annotated_rtsp_proc = None
 
 
     # -----------------------------------------------------------------------
@@ -1184,6 +1225,20 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
         if writer is not None:
             writer.write(frame)
 
+        if annotated_rtsp_proc is None and writer is not None:
+            annotated_rtsp_proc = start_annotated_rtsp_publisher(frame.shape[1], frame.shape[0], fps)
+
+        if annotated_rtsp_proc is not None and annotated_rtsp_proc.stdin is not None:
+            try:
+                annotated_rtsp_proc.stdin.write(frame.tobytes())
+                annotated_rtsp_proc.stdin.flush()
+            except Exception as exc:
+                print(f"[WARN] Annotated RTSP stream failed: {exc}")
+                try:
+                    annotated_rtsp_proc.stdin.close()
+                except Exception:
+                    pass
+                annotated_rtsp_proc = None
 
         # -------------------------------------------------------------------
         # Display live detection window
@@ -1219,6 +1274,16 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False):
 
         writer.release()
 
+    if annotated_rtsp_proc is not None:
+        if annotated_rtsp_proc.stdin is not None:
+            try:
+                annotated_rtsp_proc.stdin.close()
+            except Exception:
+                pass
+        try:
+            annotated_rtsp_proc.wait(timeout=2)
+        except Exception:
+            annotated_rtsp_proc.terminate()
 
     cv2.destroyAllWindows()
 

@@ -142,7 +142,7 @@ function Settings() {
             <div className="setting-content">
               <span>NIGHT PERIOD</span>
               <strong>19:00 – 06:00</strong>
-              <small>Night movement classification</small>
+              <small>Person movement classification</small>
             </div>
           </div>
 
