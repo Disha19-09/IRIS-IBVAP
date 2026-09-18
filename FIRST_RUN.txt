@@ -1,0 +1,100 @@
+╔═══════════════════════════════════════════════════════════════╗
+║              IRIS-IBVAP First Run Setup                       ║
+╚═══════════════════════════════════════════════════════════════╝
+
+PREREQUISITES:
+  • Python 3.9+ installed with venv created
+  • Node.js and npm installed  
+  • All dependencies installed (see README.md for setup)
+  • venv/, node_modules/ folders must exist
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 1: Run START.bat                                        │
+└───────────────────────────────────────────────────────────────┘
+
+Double-click: START.bat
+
+This will:
+  ✓ Stop any running services
+  ✓ Start all 5 services in separate windows
+
+┌───────────────────────────────────────────────────────────────┐
+│  WHAT WILL HAPPEN                                              │
+└───────────────────────────────────────────────────────────────┘
+
+You'll see 6 windows:
+  1. START.bat (main window - can close after services start)
+  2. 1-MediaMTX (streaming server)
+  3. 2-FFmpeg (video publisher)
+  4. 3-Backend (FastAPI server)
+  4. 4-Dashboard (React dev server)
+  6. 5-CV-Pipeline (YOLO detection)
+
+Windows 2-6 will stay open and show logs.
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 2: Wait for Services to Start                           │
+└───────────────────────────────────────────────────────────────┘
+
+Wait for these messages:
+
+1-MediaMTX:
+  ✓ [RTSP] started with listener on :8554
+
+2-FFmpeg:
+  ✓ Shows video encoding progress
+
+3-Backend:
+  ✓ Uvicorn running on http://127.0.0.1:8000
+  ✓ Application startup complete
+
+4-Dashboard:
+  ✓ VITE ready in XXXms
+  ✓ Local: http://127.0.0.1:5173/
+
+5-CV-Pipeline:
+  ✓ [INFO] Starting pipeline on: rtsp://...
+  ✓ Shows detection logs
+
+Total wait time: ~30-60 seconds
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 3: Access Dashboard                                     │
+└───────────────────────────────────────────────────────────────┘
+
+Open browser: http://127.0.0.1:5173/
+
+Login:
+  Username: admin
+  Password: admin123
+
+┌───────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING                                               │
+└───────────────────────────────────────────────────────────────┘
+
+If a window closes immediately:
+  • Check that window for error messages
+  • Common issues:
+    - Python not in PATH
+    - Node.js/npm not installed
+    - Port already in use (8000, 5173, 8554, 8889)
+
+If installation fails:
+  • Check internet connection
+  • Run as Administrator
+  • Manually create venv: python -m venv venv
+  • Manually install deps: 
+      venv\Scripts\activate
+      pip install -r requirements.txt
+
+If services won't start:
+  • Run STOP_ALL.bat first
+  • Wait 5 seconds
+  • Run START.bat again
+
+═══════════════════════════════════════════════════════════════
+
+The system is now running!
+Just use START.bat to launch everything.
+
+═══════════════════════════════════════════════════════════════

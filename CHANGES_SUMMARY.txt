@@ -2,6 +2,17 @@
   IRIS-IBVAP Changes Summary
 ═══════════════════════════════════════════════════════════════
 
+✅ Real-time Dashboard Updates (LATEST)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Removed ALL mock data generation
+• Dashboard now shows only real detections from CV pipeline
+• WebSocket for instant alert delivery
+• HTTP polling every 2s as fallback
+• Added console logging for debugging
+• ~60 lines of mock logic removed
+
+See REALTIME_UPDATES.md for full details.
+
 ✅ Database Changes
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Deleted alerts.db (will be auto-created on first run)

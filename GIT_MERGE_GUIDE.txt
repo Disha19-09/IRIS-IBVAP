@@ -1,0 +1,171 @@
+╔═══════════════════════════════════════════════════════════════╗
+║          How to Merge Integration → Main Branch               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+CURRENT STATUS:
+  • You're on: integration branch
+  • Want to merge: integration → main
+  • Status: Uncommitted changes
+
+═══════════════════════════════════════════════════════════════
+
+STEP-BY-STEP MERGE PROCESS
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 1: Commit All Changes on Integration Branch             │
+└───────────────────────────────────────────────────────────────┘
+
+# Stage all changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat: Add real-time dashboard, optimize performance, implement temporary snapshots"
+
+# Or write a detailed commit message
+git commit
+
+Then write:
+───────────────────────────────────────
+feat: Complete system improvements
+
+- Remove mock data from dashboard
+- Implement real-time WebSocket updates
+- Optimize CV pipeline (process every 3rd frame)
+- Add temporary snapshot cleanup (1-hour retention)
+- Simplify startup to single START.bat file
+- Clean up alerts.db from git tracking
+───────────────────────────────────────
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 2: Push Integration Branch (Optional but Recommended)   │
+└───────────────────────────────────────────────────────────────┘
+
+# Push your changes to remote
+git push origin integration
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 3: Switch to Main Branch                                │
+└───────────────────────────────────────────────────────────────┘
+
+git checkout main
+
+# Make sure main is up to date
+git pull origin main
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 4: Merge Integration into Main                          │
+└───────────────────────────────────────────────────────────────┘
+
+# Merge integration branch into main
+git merge integration
+
+# If no conflicts, you're done!
+# If conflicts, see "HANDLING CONFLICTS" below
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 5: Push Main Branch                                     │
+└───────────────────────────────────────────────────────────────┘
+
+git push origin main
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 6: Switch Back to Integration (Optional)                │
+└───────────────────────────────────────────────────────────────┘
+
+# If you want to continue working on integration
+git checkout integration
+
+═══════════════════════════════════════════════════════════════
+
+COMPLETE COMMAND SEQUENCE
+
+# From integration branch:
+git add .
+git commit -m "feat: Complete system improvements"
+git push origin integration
+
+# Switch to main and merge:
+git checkout main
+git pull origin main
+git merge integration
+git push origin main
+
+# Go back to integration:
+git checkout integration
+
+═══════════════════════════════════════════════════════════════
+
+HANDLING MERGE CONFLICTS
+
+If you see: "CONFLICT (content): Merge conflict in <file>"
+
+1. Open the conflicted file(s)
+2. Look for conflict markers:
+   <<<<<<< HEAD
+   (main branch code)
+   =======
+   (integration branch code)
+   >>>>>>> integration
+
+3. Choose which code to keep (or combine both)
+4. Remove the conflict markers
+5. Stage the resolved file:
+   git add <file>
+
+6. Complete the merge:
+   git commit
+
+7. Push:
+   git push origin main
+
+═══════════════════════════════════════════════════════════════
+
+ALTERNATIVE: CREATE PULL REQUEST (GitHub/GitLab)
+
+Instead of local merge, use web interface:
+
+1. Push integration branch:
+   git push origin integration
+
+2. Go to GitHub/GitLab repository
+3. Click "New Pull Request"
+4. Select: integration → main
+5. Review changes
+6. Click "Merge Pull Request"
+7. Pull main locally:
+   git checkout main
+   git pull origin main
+
+═══════════════════════════════════════════════════════════════
+
+UNDO MERGE (If Something Goes Wrong)
+
+Before pushing to origin:
+  git merge --abort       # Cancel ongoing merge
+  git reset --hard HEAD~1 # Undo last commit
+
+After pushing:
+  git revert <commit-hash>  # Safer - creates new commit
+
+═══════════════════════════════════════════════════════════════
+
+CURRENT FILES TO COMMIT:
+
+Modified:
+  • CHANGES_SUMMARY.txt
+  • HOW_TO_RUN.txt
+  • START.bat
+  • cv_pipeline/detect_track_fence.py
+  • dashboard/app/src/api/useAlerts.js
+
+New Files:
+  • FINAL_STATUS.txt
+  • FIRST_RUN.txt
+  • REALTIME_UPDATES.md
+  • SNAPSHOT_CLEANUP.md
+  • TEST_REALTIME.txt
+
+Deleted (already staged):
+  • backend/alerts.db
+
+═══════════════════════════════════════════════════════════════

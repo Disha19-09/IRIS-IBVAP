@@ -1,0 +1,101 @@
+╔═══════════════════════════════════════════════════════════════╗
+║           Testing Real-time Dashboard Updates                 ║
+╚═══════════════════════════════════════════════════════════════╝
+
+BEFORE STARTING:
+  • Make sure no old services are running
+  • Close all browser tabs with the dashboard
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 1: Start the System                                     │
+└───────────────────────────────────────────────────────────────┘
+
+Run: START.bat
+
+Wait for all 5 windows to appear:
+  ✓ MediaMTX
+  ✓ Video-Stream (FFmpeg)
+  ✓ Backend-API
+  ✓ Dashboard
+  ✓ CV-Pipeline
+
+Wait 30 seconds for everything to initialize.
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 2: Open Dashboard with Console                          │
+└───────────────────────────────────────────────────────────────┘
+
+1. Open browser: http://127.0.0.1:5173/
+2. Press F12 to open Developer Console
+3. Go to "Console" tab
+4. Login: admin / admin123
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 3: Verify WebSocket Connection                          │
+└───────────────────────────────────────────────────────────────┘
+
+Look in browser console for:
+  ✅ [WebSocket] Connected to alerts stream
+
+Also check:
+  ✅ Status badge shows "BACKEND LIVE"
+  ✅ No mock alerts appearing (no alerts yet is OK)
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 4: Wait for Real Detections                             │
+└───────────────────────────────────────────────────────────────┘
+
+The CV Pipeline is processing test_4.mp4 in a loop.
+
+Watch the console for real-time alerts:
+  [WebSocket] Received alert: {event_type: "virtual_fence_crossing", ...}
+
+Watch the dashboard for:
+  • Person/Vehicle counts increasing
+  • Active Alerts panel populating
+  • Security Events counter going up
+
+This proves the system is now 100% real-time!
+
+┌───────────────────────────────────────────────────────────────┐
+│  WHAT YOU SHOULD SEE                                           │
+└───────────────────────────────────────────────────────────────┘
+
+✅ CORRECT BEHAVIOR (Real-time):
+  • Alerts appear when CV pipeline detects crossings
+  • Console shows: "[WebSocket] Received alert: ..."
+  • Counts update immediately
+  • No alerts appear when nothing is detected
+
+❌ OLD BEHAVIOR (Removed):
+  • Mock alerts appearing every 5 seconds
+  • Alerts appearing even with no video
+  • Same fake alerts repeating
+
+┌───────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING                                               │
+└───────────────────────────────────────────────────────────────┘
+
+No alerts appearing?
+  → Check CV-Pipeline window for detection logs
+  → Check video is playing (not frozen)
+  → Verify Backend-API window shows no errors
+
+Console shows "[WebSocket] Disconnected"?
+  → Backend API not running on port 8000
+  → Restart with START.bat
+
+Video not showing?
+  → MediaMTX or FFmpeg not running
+  → Restart with START.bat
+
+═══════════════════════════════════════════════════════════════
+
+SUCCESS CRITERIA:
+  ✓ WebSocket connected
+  ✓ Real alerts appear when CV detects crossings
+  ✓ Console logs show "[WebSocket] Received alert: ..."
+  ✓ No mock/fake alerts appearing
+  ✓ Dashboard updates instantly when events occur
+
+═══════════════════════════════════════════════════════════════

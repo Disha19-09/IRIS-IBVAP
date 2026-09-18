@@ -2,6 +2,8 @@
 ║                   IRIS-IBVAP Quick Start                      ║
 ╚═══════════════════════════════════════════════════════════════╝
 
+⚠️  FIRST TIME? Read FIRST_RUN.txt for setup instructions!
+
 ┌───────────────────────────────────────────────────────────────┐
 │  STEP 1: Start the System                                     │
 └───────────────────────────────────────────────────────────────┘
@@ -9,7 +11,7 @@
 Double-click:  START.bat
 
 This will:
-  ✓ Check and install auth dependencies (if needed)
+  ✓ Check dependencies (installs if missing)
   ✓ Start MediaMTX (video streaming server)
   ✓ Start FFmpeg (video publisher)
   ✓ Start Backend API (port 8000)
@@ -17,6 +19,7 @@ This will:
   ✓ Start CV Pipeline (detection & tracking)
 
 Wait about 30 seconds for all services to start.
+(First run takes longer - see FIRST_RUN.txt)
 
 ┌───────────────────────────────────────────────────────────────┐
 │  STEP 2: Open Dashboard                                       │

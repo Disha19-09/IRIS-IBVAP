@@ -76,6 +76,10 @@ ALERT_COOLDOWN_TIME = 5.0          # Seconds to wait before allowing another ale
 # ANPR configuration
 ANPR_CONFIDENCE_THRESHOLD = 0.3    # Minimum confidence for ANPR text detection
 
+# Snapshot management (Option 3: Temporary snapshots)
+SNAPSHOT_RETENTION_HOURS = 1       # Auto-delete snapshots older than 1 hour
+SNAPSHOT_CLEANUP_INTERVAL = 300    # Check for old snapshots every 5 minutes (seconds)
+
 
 # ---------------------------------------------------------------------------
 # VIRTUAL FENCE
@@ -339,6 +343,47 @@ def is_night():
         return NIGHT_START_HOUR <= hour < NIGHT_END_HOUR
 
 
+def cleanup_old_snapshots():
+    """
+    Delete snapshot files older than SNAPSHOT_RETENTION_HOURS.
+    This runs periodically to prevent disk usage growth.
+    """
+    try:
+        if not os.path.exists(SNAPSHOTS_DIR):
+            return
+        
+        current_time = time.time()
+        retention_seconds = SNAPSHOT_RETENTION_HOURS * 3600
+        deleted_count = 0
+        
+        for filename in os.listdir(SNAPSHOTS_DIR):
+            if not filename.startswith("alert_"):
+                continue
+                
+            filepath = os.path.join(SNAPSHOTS_DIR, filename)
+            
+            # Skip if not a file
+            if not os.path.isfile(filepath):
+                continue
+            
+            # Get file age
+            file_age = current_time - os.path.getmtime(filepath)
+            
+            # Delete if older than retention period
+            if file_age > retention_seconds:
+                try:
+                    os.remove(filepath)
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"[WARNING] Failed to delete {filename}: {e}")
+        
+        if deleted_count > 0:
+            print(f"[INFO] Cleaned up {deleted_count} old snapshot(s)")
+            
+    except Exception as e:
+        print(f"[ERROR] Snapshot cleanup failed: {e}")
+
+
 # ---------------------------------------------------------------------------
 # ANPR
 # ---------------------------------------------------------------------------
@@ -593,10 +638,11 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
 
     # -----------------------------------------------------------------------
-    # Frame counter
+    # Frame counter and cleanup tracking
     # -----------------------------------------------------------------------
 
     frame_idx = 0
+    last_cleanup_time = time.time()
 
 
     print(
@@ -610,6 +656,10 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
     print(
         f"[INFO] Output video: {output_path}"
+    )
+    
+    print(
+        f"[INFO] Snapshot retention: {SNAPSHOT_RETENTION_HOURS} hour(s)"
     )
 
 
@@ -643,6 +693,12 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
         result = results[0]
 
         frame_idx += 1
+        
+        # Periodic snapshot cleanup
+        current_time = time.time()
+        if current_time - last_cleanup_time >= SNAPSHOT_CLEANUP_INTERVAL:
+            cleanup_old_snapshots()
+            last_cleanup_time = current_time
 
 
         # Process every Nth frame
