@@ -69,12 +69,40 @@ export function getAlertsWebSocketUrl() {
   return url.toString();
 }
 
-export function getEventTypeLabel(eventType) {
+export function getEventTypeLabel(eventType, eventDescription) {
+  // If we have a human-readable description, use it
+  if (eventDescription) {
+    return eventDescription;
+  }
+  
+  // Fallback to mapping for older events
   const labels = {
+    // Person crossings
+    person_crossed_fence: "Person crossed virtual fence",
+    person_crossed_fence_night: "Person crossed virtual fence",
+    
+    // Vehicle crossings
+    car_crossed_fence: "Car crossed virtual fence",
+    car_crossed_fence_night: "Car crossed virtual fence",
+    truck_crossed_fence: "Truck crossed virtual fence",
+    truck_crossed_fence_night: "Truck crossed virtual fence",
+    bus_crossed_fence: "Bus crossed virtual fence",
+    bus_crossed_fence_night: "Bus crossed virtual fence",
+    motorcycle_crossed_fence: "Motorcycle crossed virtual fence",
+    motorcycle_crossed_fence_night: "Motorcycle crossed virtual fence",
+    vehicle_crossed_fence: "Vehicle crossed virtual fence",
+    vehicle_crossed_fence_night: "Vehicle crossed virtual fence",
+    
+    // Generic
+    object_crossed_fence: "Object crossed virtual fence",
+    object_crossed_fence_night: "Object crossed virtual fence",
+    
+    // Legacy events
     virtual_fence_crossing: "Virtual Fence Crossing",
-    loitering: "Loitering",
-    night_movement_crossing: "Person Movement",
+    loitering: "Loitering Detected",
+    night_loitering: "Loitering Detected",
+    night_movement_crossing: "Movement Detected",
   };
 
-  return labels[eventType] || eventType;
+  return labels[eventType] || eventType?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || "Unknown Event";
 }

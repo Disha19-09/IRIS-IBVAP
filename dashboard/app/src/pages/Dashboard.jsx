@@ -28,6 +28,18 @@ function Dashboard() {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 
+  function formatFullDateTime(timestamp) {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) return "Unknown time";
+    return date.toLocaleString([], { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  }
+
   return (
     <div className="dashboard">
       {/* Page Header */}
@@ -138,7 +150,7 @@ function Dashboard() {
           {activeAlerts.length ? activeAlerts.slice(0, 4).map((alert) => (
             <div className="pipeline-item" key={alert.id ?? `${alert.timestamp}-${alert.track_id}`}>
               <span>
-                {getEventTypeLabel(alert.event_type) || "Security event"}
+                {getEventTypeLabel(alert.event_type, alert.event_description)}
                 <small className="alert-time">{formatAlertTime(alert.timestamp)}</small>
               </span>
               <span className="pipeline-status">{alert.object_type || "unknown"} · #{alert.track_id ?? "n/a"}</span>
@@ -167,7 +179,7 @@ function Dashboard() {
           </div>
 
           <div className="event-empty">
-            <span>{alerts.length ? `${alerts.length} event${alerts.length === 1 ? "" : "s"} recorded.` : "No events recorded in this session."}</span>
+            <span>{securityEvents.length ? `${securityEvents.length} event${securityEvents.length === 1 ? "" : "s"} recorded.` : "No events recorded in this session."}</span>
           </div>
         </div>
 

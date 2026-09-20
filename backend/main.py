@@ -354,6 +354,7 @@ def _alert_to_dict(alert: Alert) -> dict:
         "id": alert.id,
         "camera_id": alert.camera_id,
         "event_type": alert.event_type,
+        "event_description": alert.event_description,
         "object_type": alert.object_type,
         "track_id": alert.track_id,
         "confidence": alert.confidence,
@@ -376,6 +377,7 @@ async def create_event(
     alert = Alert(
         camera_id=event.get("camera_id", "CAM_01"),
         event_type=event.get("event_type"),
+        event_description=event.get("event_description"),
         object_type=event.get("object_type"),
         track_id=event.get("track_id"),
         confidence=event.get("confidence"),
@@ -438,6 +440,7 @@ async def create_event_public(event: dict, db: Session = Depends(get_db)):
     alert = Alert(
         camera_id=event.get("camera_id", "CAM_01"),
         event_type=event.get("event_type"),
+        event_description=event.get("event_description"),
         object_type=event.get("object_type"),
         track_id=event.get("track_id"),
         confidence=event.get("confidence"),

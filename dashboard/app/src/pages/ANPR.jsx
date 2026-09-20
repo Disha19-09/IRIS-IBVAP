@@ -1,10 +1,25 @@
-import { ScanLine, Car, Camera, Clock, ShieldCheck,} from "lucide-react";
+import { ScanLine, Car, Camera, Clock, ShieldCheck, AlertCircle} from "lucide-react";
 import { useAlerts } from "../api/useAlerts.js";
+import { getEventTypeLabel } from "../api/api.js";
 
 function ANPR() {
   const { alerts } = useAlerts();
-  const plates = alerts.filter((alert) => alert.plate_number);
-  const latestPlate = plates[0];
+  
+  // Filter for alerts with plate numbers (ANPR detections)
+  const anprAlerts = alerts.filter((alert) => alert.plate_number && alert.plate_number.trim());
+  
+  // Get vehicle alerts (with or without plates)
+  const vehicleAlerts = alerts.filter((alert) => 
+    alert.object_type && ['car', 'truck', 'bus', 'motorcycle'].includes(alert.object_type.toLowerCase())
+  );
+  
+  const latestPlate = anprAlerts[0];
+
+  function formatDateTime(timestamp) {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) return "Unknown time";
+    return date.toLocaleString();
+  }
 
   return (
     <div className="anpr-page">
@@ -33,8 +48,8 @@ function ANPR() {
 
           <div>
             <span className="stat-label">PLATES DETECTED</span>
-            <strong>{plates.length}</strong>
-            <small>Current session</small>
+            <strong>{anprAlerts.length}</strong>
+            <small>Successfully recognized</small>
           </div>
         </div>
 
@@ -44,9 +59,9 @@ function ANPR() {
           </div>
 
           <div>
-            <span className="stat-label">VEHICLES ANALYZED</span>
-            <strong>{alerts.filter((alert) => alert.object_type === "car").length}</strong>
-            <small>AI vehicle detection</small>
+            <span className="stat-label">VEHICLES DETECTED</span>
+            <strong>{vehicleAlerts.length}</strong>
+            <small>All vehicle types</small>
           </div>
         </div>
 
@@ -69,8 +84,8 @@ function ANPR() {
 
           <div>
             <span className="stat-label">RECOGNITION STATUS</span>
-            <strong>{latestPlate ? "READY" : "WAITING"}</strong>
-            <small>Waiting for results</small>
+            <strong>{anprAlerts.length > 0 ? "ACTIVE" : "READY"}</strong>
+            <small>{anprAlerts.length > 0 ? "Processing detections" : "Waiting for vehicles"}</small>
           </div>
         </div>
       </section>
@@ -92,11 +107,14 @@ function ANPR() {
             {latestPlate ? <>
               <Car size={42} />
               <span>{latestPlate.plate_number}</span>
-              <small>{new Date(latestPlate.timestamp).toLocaleString()}</small>
+              <small>{formatDateTime(latestPlate.timestamp)}</small>
+              <small style={{marginTop: '8px', color: '#888'}}>
+                {latestPlate.object_type?.toUpperCase()} · Track #{latestPlate.track_id}
+              </small>
             </> : <>
               <Car size={42} />
-              <span>No vehicle plate detected</span>
-              <small>Recognized number plates will appear here.</small>
+              <span>No plate detected</span>
+              <small>License plates will appear when recognized.</small>
             </>}
           </div>
         </div>
@@ -113,9 +131,22 @@ function ANPR() {
           </div>
 
           <div className="plate-result-empty">
-            <ScanLine size={26} />
-            <p>{latestPlate ? latestPlate.plate_number : "No ANPR result available."}</p>
-            <span>{latestPlate ? `Confidence: ${latestPlate.confidence ?? "unknown"}` : "Plate number and recognition confidence will appear when detected."}</span>
+            {latestPlate ? (
+              <>
+                <ScanLine size={26} />
+                <p style={{fontSize: '24px', fontWeight: 'bold', margin: '16px 0'}}>{latestPlate.plate_number}</p>
+                <span>Vehicle Type: {latestPlate.object_type?.toUpperCase() || 'Unknown'}</span>
+                <span>Track ID: #{latestPlate.track_id || 'N/A'}</span>
+                <span>Confidence: {latestPlate.confidence ? `${(latestPlate.confidence * 100).toFixed(1)}%` : 'Unknown'}</span>
+                <span>Time: {formatDateTime(latestPlate.timestamp)}</span>
+              </>
+            ) : (
+              <>
+                <ScanLine size={26} />
+                <p>No ANPR result available</p>
+                <span>License plate details will appear when a vehicle with readable plate is detected.</span>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -131,9 +162,51 @@ function ANPR() {
           <Clock size={18} />
         </div>
 
-        <div className="anpr-log-empty">
-          <span>{plates.length ? `${plates.length} number plate detection${plates.length === 1 ? "" : "s"} recorded.` : "No number plate detections recorded in this session."}</span>
-        </div>
+        {anprAlerts.length > 0 ? (
+          <div style={{padding: '20px'}}>
+            <table style={{width: '100%', borderCollapse: 'collapse'}}>
+              <thead>
+                <tr style={{borderBottom: '1px solid #333'}}>
+                  <th style={{textAlign: 'left', padding: '12px'}}>Plate Number</th>
+                  <th style={{textAlign: 'left', padding: '12px'}}>Vehicle</th>
+                  <th style={{textAlign: 'left', padding: '12px'}}>Event</th>
+                  <th style={{textAlign: 'left', padding: '12px'}}>Time</th>
+                  <th style={{textAlign: 'left', padding: '12px'}}>Track ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {anprAlerts.slice(0, 20).map((alert, idx) => (
+                  <tr key={alert.id || idx} style={{borderBottom: '1px solid #222'}}>
+                    <td style={{padding: '12px', fontWeight: 'bold', color: '#00ff88'}}>
+                      {alert.plate_number}
+                    </td>
+                    <td style={{padding: '12px'}}>
+                      {alert.object_type?.toUpperCase() || 'Vehicle'}
+                    </td>
+                    <td style={{padding: '12px', fontSize: '14px'}}>
+                      {getEventTypeLabel(alert.event_type, alert.event_description)}
+                    </td>
+                    <td style={{padding: '12px', fontSize: '14px', color: '#888'}}>
+                      {formatDateTime(alert.timestamp)}
+                    </td>
+                    <td style={{padding: '12px'}}>
+                      #{alert.track_id || 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="anpr-log-empty">
+            <span>No license plate detections recorded in this session.</span>
+            <span style={{marginTop: '8px', fontSize: '14px', color: '#666'}}>
+              {vehicleAlerts.length > 0 
+                ? `${vehicleAlerts.length} vehicle(s) detected, but no plates recognized yet.` 
+                : 'Waiting for vehicle detections with ANPR enabled...'}
+            </span>
+          </div>
+        )}
       </section>
     </div>
   );

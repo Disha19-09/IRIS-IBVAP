@@ -49,8 +49,8 @@ export function useAlerts(limit = 100) {
     // Initial fetch
     refreshAlerts();
     
-    // Poll every 2 seconds as fallback
-    pollTimer = window.setInterval(refreshAlerts, 2000);
+    // Poll every 1 second as fallback (reduced from 2 seconds)
+    pollTimer = window.setInterval(refreshAlerts, 1000);
 
     // WebSocket connection for real-time updates
     const connect = () => {
@@ -69,8 +69,8 @@ export function useAlerts(limit = 100) {
         socket.onclose = () => {
           if (!active) return;
           setConnected(false);
-          console.log("[WebSocket] Disconnected, reconnecting in 2s...");
-          reconnectTimer = window.setTimeout(connect, 2000);
+          console.log("[WebSocket] Disconnected, reconnecting in 1s...");
+          reconnectTimer = window.setTimeout(connect, 1000);
         };
         
         socket.onerror = (error) => {
@@ -92,7 +92,7 @@ export function useAlerts(limit = 100) {
         };
       } catch (error) {
         console.error("[WebSocket] Connection failed:", error);
-        reconnectTimer = window.setTimeout(connect, 2000);
+        reconnectTimer = window.setTimeout(connect, 1000);
       }
     };
 

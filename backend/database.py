@@ -17,6 +17,7 @@ class Alert(Base):
     id = Column(Integer, primary_key=True, index=True)
     camera_id = Column(String, default="CAM_01")
     event_type = Column(String)
+    event_description = Column(String, nullable=True)  # Human-readable description
     object_type = Column(String)
     track_id = Column(Integer)
     confidence = Column(Float)

@@ -1,5 +1,7 @@
 # IRIS - IBVAP Starter Kit
 
+> **Version 2.1.0** - [View Changelog](CHANGELOG.md)
+
 Intelligent Border Video Analytics Platform — a software-only AI layer that turns
 existing CCTV footage into live detection, tracking, virtual-fence alerts, and ANPR.
 
@@ -58,6 +60,22 @@ but the video panel will show a connection error until these services are up.
 
 ## 1. Run the complete live demo
 
+### Quick Start (Recommended)
+
+**Option A: Automated Launcher**
+```powershell
+.\start_demo.bat
+```
+This opens all 5 required terminals automatically.
+
+**Option B: Simple File-Based Demo** (More stable, no streaming)
+```powershell
+.\start_simple.bat
+```
+Runs backend, dashboard, and CV pipeline from a local file.
+
+### Manual Setup
+
 Open five PowerShell terminals from the repository root and run the following
 commands in order.
 
@@ -73,9 +91,12 @@ MediaMTX listens for RTSP on port `8554` and serves WebRTC on port `8889`.
 
 ```powershell
 .\tools\ffmpeg.exe -re -stream_loop -1 -i .\sample_videos\test_4.mp4 `
-  -c:v libx264 -preset ultrafast -tune zerolatency -g 30 `
-  -keyint_min 30 -sc_threshold 0 -pix_fmt yuv420p -an `
-  -f rtsp rtsp://127.0.0.1:8554/cam1
+  -c:v libx264 -preset ultrafast -tune zerolatency `
+  -profile:v baseline -level 3.0 `
+  -g 60 -keyint_min 60 -sc_threshold 0 `
+  -b:v 2M -maxrate 2M -bufsize 1M `
+  -pix_fmt yuv420p -err_detect ignore_err `
+  -an -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/cam1
 ```
 
 ### Terminal 3: Backend
@@ -127,6 +148,13 @@ model the first time it is used.
 
 ## 2. Run the CV pipeline from a local file
 
+### Using the Launcher (Recommended)
+```powershell
+cd cv_pipeline
+run_pipeline.bat
+```
+
+### Manual Command
 ```powershell
 cd cv_pipeline
 ..\venv\Scripts\python.exe detect_track_fence.py --source ..\sample_videos\test.mp4
@@ -219,7 +247,29 @@ The backend now includes comprehensive JWT authentication with role-based access
 
 ---
 
-## 6. Known limitations (be upfront about these in your pitch, don't hide them)
+## 6. Troubleshooting
+
+### H.264 Decoding Errors
+If you see `corrupted macroblock` or `error while decoding MB` messages:
+- These are usually non-fatal - the video continues playing
+- Use `start_simple.bat` for file-based processing (most stable)
+- See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed fixes
+
+### Lagging Video Stream
+- Check MediaMTX is running
+- Use the optimized FFmpeg command in README (updated)
+- Clear browser cache and reload dashboard
+
+### Alerts Not Syncing
+- Verify backend is running at http://localhost:8000
+- Check browser console (F12) for WebSocket connection status
+- Poll interval is now 1 second (faster updates)
+
+**Full troubleshooting guide:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+---
+
+## 7. Known limitations (be upfront about these in your pitch, don't hide them)
 
 - Runs on CPU — fine for a demo, would need edge GPU (e.g. Jetson) for real deployment.
 - ANPR accuracy depends heavily on plate visibility/angle in your test clip.

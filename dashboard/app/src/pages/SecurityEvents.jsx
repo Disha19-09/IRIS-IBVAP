@@ -6,6 +6,19 @@ function SecurityEvents() {
   const { alerts, connected } = useAlerts();
   const countByType = (types) => alerts.filter((alert) => types.includes(alert.event_type)).length;
   const securityEvents = alerts.filter((alert) => alert.event_type !== "tracking_update");
+  
+  function formatEventTime(timestamp) {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) return "Unknown time";
+    return date.toLocaleString([], { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  }
+  
   return (
     <div className="events-page">
       {/* Page Header */}
@@ -88,8 +101,8 @@ function SecurityEvents() {
 
         {securityEvents.length ? securityEvents.map((alert) => (
           <div className="pipeline-item" key={alert.id}>
-            <span>{getEventTypeLabel(alert.event_type)} · {alert.object_type || "unknown"}</span>
-            <span className="pipeline-status">{new Date(alert.timestamp).toLocaleTimeString()}</span>
+            <span>{getEventTypeLabel(alert.event_type, alert.event_description)} · {alert.object_type || "unknown"}</span>
+            <span className="pipeline-status">{formatEventTime(alert.timestamp)}</span>
           </div>
         )) : (
           <div className="events-empty">
