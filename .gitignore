@@ -37,3 +37,21 @@ Thumbs.db
 # IDE/editor
 .vscode/
 .idea/
+# Logs, pids, backups
+*.log
+*.pid
+*.bak
+
+# Debug crop directories
+debug_vehicle_crops/
+debug_plate_crops/
+
+# Mediamtx Linux binary (root and tools)
+mediamtx
+tools/mediamtx
+
+# Snapshots directory (artifacts)
+snapshots/
+
+# Specific artifact files
+cv_pipeline/tracking_output.txt

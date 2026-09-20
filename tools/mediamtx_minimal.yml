@@ -1,0 +1,31 @@
+# Minimal mediamtx.yml for IRIS-IBVAP v1.7.0
+logLevel: info
+logDestinations: [stdout]
+logStructured: false
+
+# RTSP server
+rtsp: true
+rtspAddress: :8554
+
+# WebRTC server
+webrtc: true
+webrtcAddress: :8889
+
+# HLS server
+hls: true
+hlsAddress: :8888
+hlsVariant: lowLatency
+
+# Disable other features
+api: false
+metrics: false
+pprof: false
+playback: false
+rtmp: false
+srt: false
+moq: false
+
+# Paths
+paths:
+  cam1:
+    source: publisher

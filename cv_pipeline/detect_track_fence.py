@@ -48,7 +48,7 @@ BACKEND_URL = "http://localhost:8000/api/events/public"  # Public endpoint (no a
 CAMERA_ID = "CAM_01"
 RESIZE_WIDTH = 640                 # Resize frames for speed
 PROCESS_EVERY_N_FRAMES = 4         # Process every 3rd frame for better performance
-ALERT_CONSEC_FRAMES = 2            # Reduced since we're processing fewer frames
+ALERT_CONSEC_FRAMES = 1            # Reduced since we're processing fewer frames
 TRACK_ALL_OBJECTS = False          # Set to True to get alerts for all tracked objects
 TRACK_ALL_FRAMES_INTERVAL = 30     # How often to log all tracked objects (in frames)
 
@@ -113,7 +113,12 @@ VEHICLE_CLASSES = {
 # Get the directory containing this Python file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOOLS_DIR = os.path.join(BASE_DIR, "..", "tools")
-FFMPEG_PATH = os.path.join(TOOLS_DIR, "ffmpeg.exe")
+# Use Windows ffmpeg.exe if available, otherwise rely on system ffmpeg (PATH)
+windows_ffmpeg = os.path.join(TOOLS_DIR, "ffmpeg.exe")
+if os.path.exists(windows_ffmpeg) and os.access(windows_ffmpeg, os.X_OK):
+    FFMPEG_PATH = windows_ffmpeg
+else:
+    FFMPEG_PATH = "ffmpeg"  # let PATH resolve it
 ANNOTATED_RTSP_URL = "rtsp://127.0.0.1:8554/cam1_processed"
 
 # D:\IRIS\iris_ibvap\backend\alerts.json
@@ -154,9 +159,13 @@ _ocr_reader = None
 
 def get_ocr_reader():
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Load EasyOCR only when needed.
     This avoids loading the OCR model when running normal detection.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
 
     global _ocr_reader
 
@@ -182,9 +191,13 @@ def get_ocr_reader():
 
 def load_alerts():
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Load existing alerts from alerts.json.
     Returns an empty list if the file does not exist.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
 
     if os.path.exists(ALERTS_JSON_PATH):
 
@@ -210,11 +223,15 @@ def load_alerts():
 
 def save_alert(alert):
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Send the alert to the backend in a background thread so
     the video-processing loop does not wait for the HTTP request.
 
     Falls back to a local JSON file if the backend is unreachable.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
 
     def _send():
         try:
@@ -249,9 +266,13 @@ def save_alert(alert):
 
 def send_tracking_data(tracking_info):
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Send tracking data to the backend's /api/events endpoint for dashboard display.
     Falls back to local tracking file if backend is unreachable.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     try:
         response = requests.post(BACKEND_URL, json=tracking_info, timeout=2)
         response.raise_for_status()
@@ -267,12 +288,16 @@ def send_tracking_data(tracking_info):
 
 def side_of_line(point, line_start, line_end):
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Returns the position of a point relative to the fence line.
 
     Positive value  -> one side
     Negative value  -> opposite side
     Zero             -> exactly on the line
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
 
     x, y = point
 
@@ -287,8 +312,12 @@ def side_of_line(point, line_start, line_end):
 
 def distance_from_point_to_line(point, line_start, line_end):
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Returns the perpendicular distance from a point to a line defined by two points.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     x, y = point
     x1, y1 = line_start
     x2, y2 = line_end
@@ -309,9 +338,13 @@ def distance_from_point_to_line(point, line_start, line_end):
 
 def preprocess_for_anpr(image):
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Simple preprocessing to improve OCR accuracy on license plate regions.
     Converts to grayscale and applies contrast enhancement.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     # Convert to grayscale if needed
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -328,11 +361,65 @@ def preprocess_for_anpr(image):
     return blurred
 
 
+def localize_license_plate(vehicle_crop):
+    """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
+    Heuristic license plate localization.
+    Returns a cropped region likely containing the license plate.
+
+    Based on typical license plate positioning:
+    - Located in the lower portion of the vehicle (typically bottom 40-60%)
+    - Horizontally centered
+    - Width is typically 40-80% of vehicle width
+
+    Args:
+        vehicle_crop: Cropped image of the detected vehicle
+
+    Returns:
+        Cropped region likely containing the license plate
+    """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
+    if vehicle_crop.size == 0:
+        return vehicle_crop
+
+    height, width = vehicle_crop.shape[:2]
+
+    # Heuristic: license plate is typically in the lower part of the vehicle
+    # Take the bottom 50% of the vehicle crop
+    plate_y1 = int(height * 0.3)  # Start from 30% down from top
+    plate_y2 = height             # Go to the bottom
+
+    # Horizontally centered, taking 60% of the width
+    plate_x1 = int(width * 0.2)   # Start at 20% from left
+    plate_x2 = int(width * 0.8)   # End at 80% from left (60% width)
+
+    # Ensure bounds are within the image
+    plate_y1 = max(0, plate_y1)
+    plate_y2 = min(height, plate_y2)
+    plate_x1 = max(0, plate_x1)
+    plate_x2 = min(width, plate_x2)
+
+    # Extract the plate region
+    plate_crop = vehicle_crop[plate_y1:plate_y2, plate_x1:plate_x2]
+
+    # If the crop is too small, fall back to the original vehicle crop
+    if plate_crop.size == 0 or plate_crop.shape[0] < 10 or plate_crop.shape[1] < 10:
+        return vehicle_crop
+
+    return plate_crop
+
+
 # change 2: Added is_night() function for night movement detection
 def is_night():
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Returns True if current time is within night hours.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     now = datetime.now()
     hour = now.hour
     if NIGHT_START_HOUR > NIGHT_END_HOUR:
@@ -345,9 +432,13 @@ def is_night():
 
 def cleanup_old_snapshots():
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     Delete snapshot files older than SNAPSHOT_RETENTION_HOURS.
     This runs periodically to prevent disk usage growth.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
     try:
         if not os.path.exists(SNAPSHOTS_DIR):
             return
@@ -390,6 +481,7 @@ def cleanup_old_snapshots():
 
 def run_anpr(crop_img):
     """
+    print("[DEBUG] run_anpr called")
     Runs OCR on a cropped vehicle image.
 
     NOTE:
@@ -397,7 +489,10 @@ def run_anpr(crop_img):
     complete vehicle crop. It is not a dedicated license-plate
     detection model.
     """
+    print("[DEBUG] run_anpr called")
+    print("[DEBUG] run_anpr called")
 
+    
     try:
 
         reader = get_ocr_reader()
@@ -668,7 +763,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
     # -----------------------------------------------------------------------
 
     while True:
-
+        
         if rtsp_mode:
             frame = latest_capture.read()
 
@@ -1125,7 +1220,6 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
                 last_alert_for_track = last_alert_time.get(track_id, datetime.min)
                 time_since_last_alert = (current_time - last_alert_for_track).total_seconds()
                 cooldown_satisfied = time_since_last_alert >= ALERT_COOLDOWN_TIME
-
                 if (
                     crossing_confirm_count.get(track_id, 0)
                     >= ALERT_CONSEC_FRAMES
@@ -1208,9 +1302,11 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
 
                         if crop.size > 0:
-
+                            
+                            # Localize license plate within the vehicle crop
+                            plate_crop = localize_license_plate(crop)
                             plate_text = run_anpr(
-                                crop
+                                plate_crop
                             )
 
                         # Draw plate number on frame if ANPR is enabled and we have a result
