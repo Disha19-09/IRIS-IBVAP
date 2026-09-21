@@ -1,0 +1,207 @@
+╔═══════════════════════════════════════════════════════════════╗
+║         MOCK ANPR - DEMONSTRATION MODE                        ║
+╚═══════════════════════════════════════════════════════════════╝
+
+For demonstration purposes, the system can generate realistic
+mock license plates when OCR fails or has low confidence.
+
+┌───────────────────────────────────────────────────────────────┐
+│  How It Works                                                  │
+└───────────────────────────────────────────────────────────────┘
+
+When a vehicle is detected:
+
+  1. Try real OCR first
+     ↓
+  2. If OCR succeeds with good confidence:
+     → Use real detected plate ✅
+     → Terminal: [OCR] Detected plate: AA 82548
+     
+  3. If OCR fails or low confidence:
+     → Generate mock plate (80% probability) 🎲
+     → Terminal: [MOCK] Generated plate: BK 34567
+     → Format: 2 letters + 5 digits (Chinese style)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Configuration                                                 │
+└───────────────────────────────────────────────────────────────┘
+
+File: cv_pipeline/detect_track_fence.py
+
+Settings (lines 42-43):
+  ENABLE_MOCK_ANPR = True           # Enable/disable mock generation
+  MOCK_ANPR_PROBABILITY = 0.8       # 80% chance to generate mock
+
+To disable mock data:
+  ENABLE_MOCK_ANPR = False          # Use real OCR only
+
+To always generate mocks on OCR fail:
+  MOCK_ANPR_PROBABILITY = 1.0       # 100% chance
+
+┌───────────────────────────────────────────────────────────────┐
+│  Mock Plate Format                                             │
+└───────────────────────────────────────────────────────────────┘
+
+Generated plates match Chinese license plate format:
+  • Pattern: AA #####
+  • First letter: Random province/city code
+  • Second letter: Random district code
+  • 5 digits: Random numbers
+
+Examples:
+  • BK 34567
+  • SH 98234
+  • GD 12345
+  • AA 82548
+  • ZJ 67890
+
+┌───────────────────────────────────────────────────────────────┐
+│  Terminal Output Examples                                      │
+└───────────────────────────────────────────────────────────────┘
+
+Real OCR Success:
+  [OCR] Detected plate: AA 82548 (confidence: 0.85)
+  [ALERT] car #42 crossed fence | Plate: AA 82548 (NEW)
+
+Mock Generated (OCR empty):
+  [MOCK] OCR empty, generated: BK 34567
+  [ALERT] car #58 crossed fence | Plate: BK 34567 (NEW)
+
+Mock Generated (low confidence):
+  [MOCK] OCR low confidence (0.15), generated: SH 98234
+  [ALERT] car #67 crossed fence | Plate: SH 98234 (NEW)
+
+Mock Generated (invalid format):
+  [MOCK] OCR invalid format, generated: GD 12345
+  [ALERT] car #71 crossed fence | Plate: GD 12345 (NEW)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Dashboard Display                                             │
+└───────────────────────────────────────────────────────────────┘
+
+ANPR Tab shows:
+  ✅ Both real OCR results and mock plates
+  ✅ All formatted as "AA 12345" (with space)
+  ✅ Each plate appears only once (duplicate prevention works)
+  ✅ Recognition log shows all detected plates
+
+You cannot distinguish mock from real in the dashboard.
+Check terminal output to see [OCR] vs [MOCK] labels.
+
+┌───────────────────────────────────────────────────────────────┐
+│  Use Cases                                                     │
+└───────────────────────────────────────────────────────────────┘
+
+1. DEMONSTRATION MODE ✅ (Current)
+   • Show ANPR functionality to stakeholders
+   • Populate dashboard with realistic data
+   • Test system behavior with plates
+   • Don't rely on finicky OCR during demo
+
+2. TESTING & DEVELOPMENT
+   • Test duplicate prevention logic
+   • Verify database operations
+   • Check dashboard UI with data
+   • Develop without perfect OCR
+
+3. PRODUCTION MODE (Disable Mocks)
+   • Set ENABLE_MOCK_ANPR = False
+   • Use only real OCR detections
+   • Real-world accuracy testing
+   • Actual plate recognition
+
+┌───────────────────────────────────────────────────────────────┐
+│  Advantages                                                    │
+└───────────────────────────────────────────────────────────────┘
+
+✅ Reliable demo (not dependent on OCR quality)
+✅ Realistic plate formats (Chinese style)
+✅ Duplicate prevention still works
+✅ Easy to toggle on/off
+✅ Terminal shows what's real vs mock
+✅ Probability control (not always generate)
+✅ Real OCR takes priority when it works
+
+┌───────────────────────────────────────────────────────────────┐
+│  Disadvantages                                                 │
+└───────────────────────────────────────────────────────────────┘
+
+⚠️ Not real plate recognition
+⚠️ Cannot track actual vehicles by plate
+⚠️ Random plates don't match real vehicles
+⚠️ Should be disabled in production
+⚠️ Can give false sense of OCR working
+
+┌───────────────────────────────────────────────────────────────┐
+│  Best Practices                                                │
+└───────────────────────────────────────────────────────────────┘
+
+For Demonstrations:
+  ✅ Keep ENABLE_MOCK_ANPR = True
+  ✅ Set probability to 0.8 (not 100% for realism)
+  ✅ Show terminal to explain [MOCK] vs [OCR]
+  ✅ Clear data before demo (CLEAR_DATA.bat)
+
+For Production:
+  ✅ Set ENABLE_MOCK_ANPR = False
+  ✅ Tune OCR parameters for better detection
+  ✅ Use high-quality video source
+  ✅ Adjust ANPR_CONFIDENCE_THRESHOLD
+
+For Development:
+  ✅ Use mocks to test functionality
+  ✅ Monitor [OCR] success rate in terminal
+  ✅ Gradually improve OCR accuracy
+  ✅ Reduce mock probability as OCR improves
+
+┌───────────────────────────────────────────────────────────────┐
+│  Monitoring Real vs Mock                                       │
+└───────────────────────────────────────────────────────────────┘
+
+Check terminal output:
+  [OCR] = Real detection from image
+  [MOCK] = Generated for demonstration
+
+Count success rate:
+  Real OCR hits = [OCR] count
+  Mock fallbacks = [MOCK] count
+  Success rate = OCR / (OCR + MOCK) * 100%
+
+Goal: Increase [OCR] count by:
+  • Better video quality
+  • Better preprocessing
+  • Tuned confidence threshold
+  • Proper lighting in videos
+
+┌───────────────────────────────────────────────────────────────┐
+│  Quick Settings                                                │
+└───────────────────────────────────────────────────────────────┘
+
+Demo Mode (Current): ✅
+  ENABLE_MOCK_ANPR = True
+  MOCK_ANPR_PROBABILITY = 0.8
+
+Production Mode:
+  ENABLE_MOCK_ANPR = False
+  MOCK_ANPR_PROBABILITY = 0.0
+
+Aggressive Demo (Always Generate):
+  ENABLE_MOCK_ANPR = True
+  MOCK_ANPR_PROBABILITY = 1.0
+
+Conservative Demo (Rarely Generate):
+  ENABLE_MOCK_ANPR = True
+  MOCK_ANPR_PROBABILITY = 0.3
+
+═══════════════════════════════════════════════════════════════
+
+CURRENT STATUS:
+  ✅ Mock ANPR enabled (demonstration mode)
+  ✅ 80% generation probability
+  ✅ Chinese plate format (AA #####)
+  ✅ Duplicate prevention active
+  ✅ Real OCR still attempted first
+
+Perfect for demonstrations and testing!
+
+═══════════════════════════════════════════════════════════════

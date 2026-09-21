@@ -1,0 +1,50 @@
+╔═══════════════════════════════════════════════════════════════╗
+║           ANPR QUALITY UPGRADED - RESTART NOW!                ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Stream quality has been increased from 640x480 to 1280x720 HD
+for much better license plate recognition!
+
+┌───────────────────────────────────────────────────────────────┐
+│  RESTART INSTRUCTIONS (Required!)                              │
+└───────────────────────────────────────────────────────────────┘
+
+1. Double-click:  STOP_ALL.bat
+   
+2. Wait 5 seconds
+
+3. Double-click:  START.bat
+
+4. Wait 30 seconds
+
+5. Open: http://127.0.0.1:5173/
+
+6. Go to ANPR tab and watch!
+
+┌───────────────────────────────────────────────────────────────┐
+│  WHAT'S NEW                                                    │
+└───────────────────────────────────────────────────────────────┘
+
+✅ Video resolution: 640x480 → 1280x720 (HD quality!)
+✅ Bitrate: 1000k → 3000k (3x better quality)
+✅ FPS: 15 → 25 (smoother)
+✅ Processing: 640px → 1280px (2x detail for OCR)
+✅ Enhanced image preprocessing for OCR
+✅ Better plate localization
+✅ Lower detection threshold (more sensitive)
+
+┌───────────────────────────────────────────────────────────────┐
+│  WHAT TO EXPECT                                                │
+└───────────────────────────────────────────────────────────────┘
+
+✓ Much clearer video in Live Surveillance
+✓ Better quality snapshots
+✓ Higher ANPR detection rate
+✓ More accurate plate readings
+✓ Slightly higher CPU usage (still no GPU needed)
+
+═══════════════════════════════════════════════════════════════
+
+See ANPR_QUALITY_UPGRADE.md for full technical details.
+
+═══════════════════════════════════════════════════════════════

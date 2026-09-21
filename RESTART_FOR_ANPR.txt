@@ -1,0 +1,57 @@
+╔═══════════════════════════════════════════════════════════════╗
+║               ANPR FIXED - RESTART REQUIRED                   ║
+╚═══════════════════════════════════════════════════════════════╝
+
+The ANPR (plate recognition) feature has been fixed!
+
+The system was running WITHOUT the --anpr flag, so plates were
+not being recognized. This has now been corrected.
+
+┌───────────────────────────────────────────────────────────────┐
+│  Quick Restart Instructions                                    │
+└───────────────────────────────────────────────────────────────┘
+
+1. Double-click:  STOP_ALL.bat
+   (Stops all running services)
+
+2. Wait 5 seconds
+
+3. Double-click:  START.bat
+   (Starts everything WITH ANPR enabled)
+
+4. Wait 30 seconds for startup
+
+5. Open browser: http://127.0.0.1:5173/
+   
+6. Go to ANPR tab and watch for plate detections!
+
+┌───────────────────────────────────────────────────────────────┐
+│  What to Expect                                                │
+└───────────────────────────────────────────────────────────────┘
+
+When a vehicle crosses the virtual fence:
+  ✓ Plate number will be recognized by OCR
+  ✓ Plate displayed on video overlay (yellow text)
+  ✓ Plate recorded in database
+  ✓ Plate visible in ANPR tab of dashboard
+  ✓ Terminal shows: "[ALERT] car #123 | Plate: ABC1234"
+
+First time only:
+  - EasyOCR will download language models (~50MB)
+  - Takes about 1 minute
+  - Subsequent runs are instant
+
+┌───────────────────────────────────────────────────────────────┐
+│  Files Changed                                                 │
+└───────────────────────────────────────────────────────────────┘
+
+  ✓ START.bat (added --anpr flag)
+  ✓ cv_pipeline\run_pipeline.bat (added --anpr flag)
+
+┌───────────────────────────────────────────────────────────────┐
+│  More Information                                              │
+└───────────────────────────────────────────────────────────────┘
+
+See ANPR_FIX.md for detailed technical information.
+
+═══════════════════════════════════════════════════════════════

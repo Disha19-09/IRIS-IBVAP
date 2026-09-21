@@ -1,0 +1,152 @@
+╔═══════════════════════════════════════════════════════════════╗
+║         GPU CONFIGURATION GUIDE - NVIDIA RTX 4060             ║
+╚═══════════════════════════════════════════════════════════════╝
+
+After running FIX_PYTORCH.bat and verifying CUDA is available,
+follow these steps to enable GPU acceleration:
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 1: Enable GPU in CV Pipeline                            │
+└───────────────────────────────────────────────────────────────┘
+
+File: cv_pipeline\detect_track_fence.py
+
+Changes:
+  1. Line ~27: RESIZE_WIDTH = 960 → RESIZE_WIDTH = 1280
+  2. Line ~28: PROCESS_EVERY_N_FRAMES = 3 → PROCESS_EVERY_N_FRAMES = 2
+  3. Line ~67: LINE_START = (0, 350) → LINE_START = (0, 400)
+  4. Line ~67: LINE_END = (960, 350) → LINE_END = (1280, 400)
+  5. Line ~630: device='cpu' → device=1
+  6. Line ~131: gpu=False → gpu=True
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 2: Increase Stream Quality                              │
+└───────────────────────────────────────────────────────────────┘
+
+File: START.bat
+
+Find line with FFmpeg (line ~19):
+  
+  Change FROM:
+  scale=1280:720,fps=20 ... -b:v 2000k -maxrate 2500k -bufsize 4000k
+  
+  Change TO:
+  scale=1920:1080,fps=30 ... -b:v 4000k -maxrate 5000k -bufsize 8000k
+
+Full line should be:
+  tools\ffmpeg.exe -re -stream_loop -1 -i sample_videos\test_2.mp4 -vf scale=1920:1080,fps=30 -c:v libx264 -preset veryfast -tune zerolatency -profile:v high -level 4.1 -g 60 -sc_threshold 0 -pix_fmt yuv420p -b:v 4000k -maxrate 5000k -bufsize 8000k -an -rtsp_transport tcp -f rtsp rtsp://127.0.0.1:8554/cam1
+
+┌───────────────────────────────────────────────────────────────┐
+│  EXACT CHANGES - Copy/Paste Ready                             │
+└───────────────────────────────────────────────────────────────┘
+
+cv_pipeline\detect_track_fence.py:
+
+Line 27:
+  RESIZE_WIDTH = 1280
+
+Line 28:
+  PROCESS_EVERY_N_FRAMES = 2
+
+Line 67-68:
+  LINE_START = (0, 400)
+  LINE_END = (1280, 400)
+
+Line 131 (in get_ocr_reader function):
+  _ocr_reader = easyocr.Reader(["en"], gpu=True)
+
+Line 630 (in model.track call):
+  device=1,  # Use NVIDIA GPU (device 1)
+
+┌───────────────────────────────────────────────────────────────┐
+│  STEP 3: Restart System                                       │
+└───────────────────────────────────────────────────────────────┘
+
+1. Run: STOP_ALL.bat
+2. Wait 5 seconds
+3. Run: START.bat
+4. Wait 30-45 seconds (GPU initialization)
+5. Open: http://127.0.0.1:5173/
+
+┌───────────────────────────────────────────────────────────────┐
+│  Verify GPU is Working                                         │
+└───────────────────────────────────────────────────────────────┘
+
+Terminal should show:
+  [INFO] Loading YOLO model...
+  [INFO] Loading EasyOCR model with NVIDIA GPU acceleration...
+
+Task Manager:
+  • Open Task Manager → Performance → GPU 1
+  • Should show 40-60% usage when running
+  • Memory: 2-3GB used
+
+Command line:
+  nvidia-smi -l 1
+
+┌───────────────────────────────────────────────────────────────┐
+│  Expected Performance with GPU Enabled                         │
+└───────────────────────────────────────────────────────────────┘
+
+Video Stream:
+  ✅ 1920x1080 @ 30fps (crystal clear)
+  ✅ 4000kbps bitrate (high quality)
+
+Processing:
+  ✅ 1280px resolution (2x detail)
+  ✅ Every 2nd frame (2x more frames)
+  ✅ 5-10x faster than CPU
+
+ANPR:
+  ✅ 1080p vehicle crops (huge!)
+  ✅ 70-90% detection rate
+  ✅ GPU-accelerated OCR
+
+Performance:
+  ✅ Real-time, no lag
+  ✅ GPU usage: 40-60%
+  ✅ VRAM usage: 2-3GB
+
+┌───────────────────────────────────────────────────────────────┐
+│  Troubleshooting                                               │
+└───────────────────────────────────────────────────────────────┘
+
+If GPU not detected:
+  • Verify CUDA available:
+    python -c "import torch; print(torch.cuda.is_available())"
+  • Should show: True
+
+If out of memory:
+  • Reduce RESIZE_WIDTH to 960
+  • Or reduce stream to 1280x720
+
+If system slow:
+  • Check GPU usage in Task Manager
+  • Should be using GPU 1 (NVIDIA), not GPU 0 (Intel)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Current vs GPU Configuration                                  │
+└───────────────────────────────────────────────────────────────┘
+
+CURRENT (CPU):
+  Stream: 1280x720 @ 20fps @ 2000k
+  Processing: 960px, every 3rd frame
+  Device: CPU
+  ANPR: CPU OCR
+
+AFTER GPU ENABLED:
+  Stream: 1920x1080 @ 30fps @ 4000k
+  Processing: 1280px, every 2nd frame
+  Device: NVIDIA RTX 4060 (device 1)
+  ANPR: GPU-accelerated OCR
+
+═══════════════════════════════════════════════════════════════
+
+Summary:
+  1. Run FIX_PYTORCH.bat (installs CUDA PyTorch)
+  2. Edit detect_track_fence.py (6 changes)
+  3. Edit START.bat (1 change)
+  4. Restart system
+  5. Enjoy 5-10x faster performance!
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,157 @@
+╔═══════════════════════════════════════════════════════════════╗
+║              FRESH START - CLEAN RUN                          ║
+╚═══════════════════════════════════════════════════════════════╝
+
+To start fresh with no previous data:
+
+┌───────────────────────────────────────────────────────────────┐
+│  Step 1: Clear All Data                                        │
+└───────────────────────────────────────────────────────────────┘
+
+Double-click: CLEAR_DATA.bat
+
+This will:
+  ✅ Stop all running services
+  ✅ Delete alerts database (alerts.db)
+  ✅ Delete all snapshots (*.jpg)
+  ✅ Delete all logs (*.log)
+  ✅ Delete JSON and CSV files
+
+WARNING: Cannot be undone! All previous data will be lost.
+
+┌───────────────────────────────────────────────────────────────┐
+│  Step 2: Start System Fresh                                   │
+└───────────────────────────────────────────────────────────────┘
+
+Double-click: START.bat
+
+Wait 30 seconds for all services to initialize.
+
+┌───────────────────────────────────────────────────────────────┐
+│  Step 3: Access Dashboard                                     │
+└───────────────────────────────────────────────────────────────┘
+
+Open browser: http://127.0.0.1:5173/
+
+Login:
+  Username: admin
+  Password: admin123
+
+┌───────────────────────────────────────────────────────────────┐
+│  What to Expect (Fresh Start)                                 │
+└───────────────────────────────────────────────────────────────┘
+
+Dashboard Overview:
+  • Active Alerts: 0
+  • Recent Security Events: Empty
+  • Processing Status: READY
+
+ANPR Tab:
+  • Plates Detected: 0
+  • Recognition Log: Empty
+  • No previous plates recorded
+
+Evidence Tab:
+  • No snapshots
+  • Fresh start
+
+Security Events Tab:
+  • No events
+  • Will populate as detections happen
+
+┌───────────────────────────────────────────────────────────────┐
+│  Testing ANPR with Fresh Data                                 │
+└───────────────────────────────────────────────────────────────┘
+
+1. System starts detecting vehicles
+
+2. When vehicle crosses fence:
+   • Terminal shows: [ALERT] car #X | Plate: AA 82548 (NEW)
+   • Snapshot saved
+   • Alert recorded
+
+3. ANPR Tab updates:
+   • Shows detected plates
+   • Each plate appears only once (no duplicates)
+   • Format: "AA 82548" (with space)
+
+4. If same plate crosses again:
+   • Terminal shows: (DUPLICATE - not recorded)
+   • Crossing recorded but plate not duplicated
+   • ANPR tab stays the same (no new entry)
+
+┌───────────────────────────────────────────────────────────────┐
+│  What Gets Cleared                                             │
+└───────────────────────────────────────────────────────────────┘
+
+Database:
+  ✅ backend/alerts.db (SQLite database)
+  ✅ backend/alerts.json (fallback JSON)
+  ✅ backend/alerts.csv (if exists)
+
+Snapshots:
+  ✅ snapshots/*.jpg (all evidence images)
+  ✅ snapshots/*.mp4 (annotated videos)
+
+Logs:
+  ✅ cv_pipeline/*.log (pipeline logs)
+  ✅ sample_videos/*.log (publisher logs)
+
+┌───────────────────────────────────────────────────────────────┐
+│  What Stays (Not Cleared)                                      │
+└───────────────────────────────────────────────────────────────┘
+
+Configuration:
+  ✅ detect_track_fence.py settings
+  ✅ START.bat configuration
+  ✅ User accounts (admin still works)
+  ✅ Virtual fence position
+  ✅ ANPR settings
+
+Code:
+  ✅ All Python scripts
+  ✅ All batch files
+  ✅ Sample videos (test_2.mp4, etc.)
+  ✅ Models (yolov8n.pt)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Verification Checklist                                        │
+└───────────────────────────────────────────────────────────────┘
+
+After clearing data:
+  □ No files in snapshots/ folder
+  □ No alerts.db in backend/
+  □ Dashboard shows 0 alerts
+  □ ANPR tab is empty
+
+After fresh start:
+  □ System running smoothly
+  □ Video stream visible
+  □ Detections happening
+  □ ANPR recording new plates only
+
+┌───────────────────────────────────────────────────────────────┐
+│  Quick Commands                                                │
+└───────────────────────────────────────────────────────────────┘
+
+Full Reset:
+  1. CLEAR_DATA.bat
+  2. START.bat
+
+Stop System:
+  • STOP_ALL.bat
+
+View Snapshots:
+  • Open: snapshots/ folder
+
+Check Database:
+  • backend/alerts.db (SQLite browser)
+
+═══════════════════════════════════════════════════════════════
+
+QUICK FRESH START:
+  1. CLEAR_DATA.bat (deletes all previous data)
+  2. START.bat (starts system fresh)
+  3. http://127.0.0.1:5173/ (login and test)
+
+═══════════════════════════════════════════════════════════════

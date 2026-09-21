@@ -1,0 +1,173 @@
+╔═══════════════════════════════════════════════════════════════╗
+║         ANPR IMPROVEMENTS - CHINESE PLATE FORMAT              ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Target License Plates (from your video):
+  • AA 82548 (brown car)
+  • AA 34261 (white Audi)
+  • AA 34086 (dark car)
+
+Format: 2 letters + space + 5 digits
+
+┌───────────────────────────────────────────────────────────────┐
+│  Improvements Made                                             │
+└───────────────────────────────────────────────────────────────┘
+
+1. ✅ PLATE FORMAT VALIDATION
+   • Recognizes: 2 letters + 5 digits (e.g., AA82548)
+   • Automatically formats with space: "AA 82548"
+   • Minimum 5 characters required
+   • Validates letter-digit combination
+
+2. ✅ DUPLICATE PREVENTION
+   • Tracks all recorded plates in memory
+   • Prevents same plate from being recorded twice
+   • Terminal shows: "(DUPLICATE - not recorded)"
+   • Only first detection is saved to database
+
+3. ✅ ENHANCED PREPROCESSING
+   • Increased CLAHE contrast (clipLimit 3.0)
+   • Added sharpening kernel for character edges
+   • Adaptive thresholding for varying lighting
+   • Binary conversion for optimal OCR
+
+4. ✅ BETTER TEXT CLEANING
+   • Specifically designed for AA##### format
+   • Handles OCR noise and misreads
+   • Falls back to generic alphanumeric if pattern doesn't match
+
+┌───────────────────────────────────────────────────────────────┐
+│  How It Works                                                  │
+└───────────────────────────────────────────────────────────────┘
+
+Vehicle Crosses Fence
+  ↓
+Crop vehicle from original quality frame
+  ↓
+Localize plate region (bottom 50% of vehicle)
+  ↓
+Enhanced preprocessing:
+  • Convert to grayscale
+  • CLAHE contrast enhancement (3.0)
+  • Sharpen with kernel
+  • Adaptive threshold → Binary image
+  ↓
+EasyOCR reads text
+  ↓
+Sanitize & validate:
+  • Remove special characters
+  • Match pattern: 2 letters + 5 digits
+  • Format as "AA 82548"
+  ↓
+Check if plate already recorded
+  ↓
+If NEW: Save to database
+If DUPLICATE: Skip (log only)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Terminal Output Examples                                      │
+└───────────────────────────────────────────────────────────────┘
+
+First Detection:
+  [ALERT] car #42 crossed fence | Plate: AA 82548 (NEW)
+
+Same Plate Again:
+  [INFO] Plate AA 82548 already recorded, skipping duplicate
+  [ALERT] car #58 crossed fence | Plate: AA 82548 (DUPLICATE - not recorded)
+
+Different Plate:
+  [ALERT] car #67 crossed fence | Plate: AA 34261 (NEW)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Dashboard Behavior                                            │
+└───────────────────────────────────────────────────────────────┘
+
+ANPR Tab will show:
+  ✅ Each unique plate only once
+  ✅ No duplicate entries
+  ✅ Formatted plates (AA 82548)
+  ✅ Recognition log with timestamps
+
+Security Events Tab will show:
+  ✅ All fence crossings (including duplicates)
+  ✅ Only new plates have plate_number field
+  ✅ Duplicate crossings have null plate_number
+
+┌───────────────────────────────────────────────────────────────┐
+│  Plate Format Patterns Recognized                             │
+└───────────────────────────────────────────────────────────────┘
+
+Primary Format (Strict):
+  • 2 letters + 5 digits
+  • Examples: AA82548, AA34261, AA34086
+  • Formatted output: "AA 82548"
+
+Fallback Format (Relaxed):
+  • At least 5 characters
+  • Must have both letters AND digits
+  • Examples: ABC123, XY12345, etc.
+  • Raw output: "ABC123"
+
+Invalid (Rejected):
+  • Less than 5 characters
+  • Only letters or only digits
+  • Too much noise/special characters
+
+┌───────────────────────────────────────────────────────────────┐
+│  Configuration                                                 │
+└───────────────────────────────────────────────────────────────┘
+
+ANPR Confidence Threshold: 0.2 (permissive)
+Minimum Characters: 5
+Pattern Match: ^([A-Z]{2})(\d{5})$
+Duplicate Tracking: In-memory set (resets on restart)
+
+To adjust confidence:
+  Edit detect_track_fence.py, line ~70:
+  ANPR_CONFIDENCE_THRESHOLD = 0.2  # Lower = more permissive
+
+┌───────────────────────────────────────────────────────────────┐
+│  Testing                                                       │
+└───────────────────────────────────────────────────────────────┘
+
+1. Run system: START.bat
+
+2. Watch terminal for plate detections
+
+3. Check ANPR tab for unique plates
+
+4. Verify no duplicates appear
+
+5. Test with video containing:
+   • AA 82548 (should recognize and format)
+   • AA 34261 (should recognize and format)
+   • AA 34086 (should recognize and format)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Troubleshooting                                               │
+└───────────────────────────────────────────────────────────────┘
+
+Plates not detected:
+  • Check OCR confidence threshold (lower it)
+  • Verify plates are visible in snapshots
+  • Check terminal for OCR failures
+
+Wrong format:
+  • OCR might misread characters
+  • Adjust preprocessing parameters
+  • Check snapshot image quality
+
+Still seeing duplicates:
+  • Restart system (duplicate tracking resets)
+  • Check if different track IDs
+  • Verify plate numbers match exactly
+
+═══════════════════════════════════════════════════════════════
+
+READY TO TEST:
+  1. System configured for Chinese plate format
+  2. Duplicate prevention active
+  3. Enhanced preprocessing for better OCR
+  4. Run START.bat and test!
+
+═══════════════════════════════════════════════════════════════

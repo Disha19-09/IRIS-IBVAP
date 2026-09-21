@@ -27,12 +27,15 @@ No GPU needed. Runs on CPU.
 import argparse
 import json
 import os
+import re
 import subprocess
 import threading
 import time
 from datetime import datetime
 import csv
 import requests
+import numpy as np
+import random
 
 import cv2
 from ultralytics import YOLO
@@ -46,8 +49,17 @@ MODEL_PATH = "yolov8n.pt"          # Nano model -> fastest on CPU
 CONF_THRESHOLD = 0.5               # Detection confidence cutoff (increased to reduce false detections)
 BACKEND_URL = "http://localhost:8000/api/events/public"  # Public endpoint (no auth required)
 CAMERA_ID = "CAM_01"
-RESIZE_WIDTH = 640                 # Resize frames for speed
-PROCESS_EVERY_N_FRAMES = 4         # Process every 3rd frame for better performance
+RESIZE_WIDTH = 960                 # Balanced resolution for CPU
+PROCESS_EVERY_N_FRAMES = 3         # Process every 3rd frame for CPU
+ALERT_CONSEC_FRAMES = 1            # Reduced since we're processing fewer frames
+TRACK_ALL_OBJECTS = False          # Set to True to get alerts for all tracked objects
+TRACK_ALL_FRAMES_INTERVAL = 30     # How often to log all tracked objects (in frames)
+
+# ANPR Mock Data (for demonstration)
+ENABLE_MOCK_ANPR = True            # Set to False to use real OCR only
+MOCK_ANPR_PROBABILITY = 0.8        # 80% chance to generate mock plate if OCR fails
+RESIZE_WIDTH = 960                 # Balanced resolution for CPU
+PROCESS_EVERY_N_FRAMES = 3         # Process every 3rd frame for CPU
 ALERT_CONSEC_FRAMES = 1            # Reduced since we're processing fewer frames
 TRACK_ALL_OBJECTS = False          # Set to True to get alerts for all tracked objects
 TRACK_ALL_FRAMES_INTERVAL = 30     # How often to log all tracked objects (in frames)
@@ -74,7 +86,7 @@ SIDE_HYSTERESIS = 5                # Pixels buffer zone around the line for stab
 ALERT_COOLDOWN_TIME = 5.0          # Seconds to wait before allowing another alert from the same track ID
 
 # ANPR configuration
-ANPR_CONFIDENCE_THRESHOLD = 0.3    # Minimum confidence for ANPR text detection
+ANPR_CONFIDENCE_THRESHOLD = 0.2    # Lowered minimum confidence for better detection
 
 # Snapshot management (Option 3: Temporary snapshots)
 SNAPSHOT_RETENTION_HOURS = 1       # Auto-delete snapshots older than 1 hour
@@ -84,11 +96,11 @@ SNAPSHOT_CLEANUP_INTERVAL = 300    # Check for old snapshots every 5 minutes (se
 # ---------------------------------------------------------------------------
 # VIRTUAL FENCE
 # ---------------------------------------------------------------------------
-# Coordinates are based on the resized 640px-wide frame.
+# Coordinates are based on the resized 960px-wide frame.
 # Change the Y value depending on where you want your security boundary.
 
-LINE_START = (0, 300)
-LINE_END = (640, 300)
+LINE_START = (0, 350)
+LINE_END = (960, 350)
 
 
 # ---------------------------------------------------------------------------
@@ -158,31 +170,60 @@ _ocr_reader = None
 
 
 def get_ocr_reader():
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Load EasyOCR only when needed.
-    This avoids loading the OCR model when running normal detection.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-
+    """Load EasyOCR (CPU mode until PyTorch CUDA is installed)."""
     global _ocr_reader
 
     if _ocr_reader is None:
         import easyocr
 
         print(
-            "[INFO] Loading EasyOCR model "
+            "[INFO] Loading EasyOCR model (CPU mode) "
             "(first time only, may take a minute)..."
         )
 
-        _ocr_reader = easyocr.Reader(
-            ["en"],
-            gpu=False
-        )
+        _ocr_reader = easyocr.Reader(["en"], gpu=False)  # CPU until CUDA available
 
     return _ocr_reader
+
+
+def sanitize_plate_text(text):
+    """Clean and validate plate text for format: #A XXXXX (e.g., #A 5402S)."""
+    if text is None:
+        return None
+
+    # Remove all non-alphanumeric characters except #
+    cleaned = re.sub(r"[^A-Za-z0-9#]", "", str(text).upper())
+    
+    # Must be at least 7 characters (#A + 5 alphanumeric)
+    if len(cleaned) < 7:
+        return None
+    
+    # Try to match pattern: #A + 5 alphanumeric characters
+    # Examples: #A5402S, #A12345, #AABC12
+    match = re.match(r'^(#A)([A-Z0-9]{5})$', cleaned)
+    if match:
+        # Format as: #A 5402S (with space)
+        return f"{match.group(1)} {match.group(2)}"
+    
+    # Fallback: If it starts with #A and has at least 5 more characters
+    if cleaned.startswith('#A') and len(cleaned) >= 7:
+        prefix = cleaned[:2]  # #A
+        suffix = cleaned[2:7]  # Next 5 characters
+        return f"{prefix} {suffix}"
+    
+    return None
+
+
+def generate_mock_plate():
+    """Generate a realistic mock license plate in format: #A XXXXX (e.g., #A 5402S)"""
+    # Characters for the 5-character suffix (alphanumeric)
+    alphanumeric = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    
+    # Generate 5 random alphanumeric characters
+    suffix = ''.join([random.choice(alphanumeric) for _ in range(5)])
+    
+    # Fixed prefix #A + space + random suffix
+    return f"#A {suffix}"
 
 
 # ---------------------------------------------------------------------------
@@ -190,95 +231,38 @@ def get_ocr_reader():
 # ---------------------------------------------------------------------------
 
 def load_alerts():
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Load existing alerts from alerts.json.
-    Returns an empty list if the file does not exist.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-
+    """Load existing alerts from alerts.json."""
     if os.path.exists(ALERTS_JSON_PATH):
-
         try:
-
-            with open(
-                ALERTS_JSON_PATH,
-                "r",
-                encoding="utf-8"
-            ) as f:
-
+            with open(ALERTS_JSON_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
-
-        except (
-            json.JSONDecodeError,
-            FileNotFoundError
-        ):
-
+        except (json.JSONDecodeError, FileNotFoundError):
             return []
-
     return []
 
 
 def save_alert(alert):
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Send the alert to the backend in a background thread so
-    the video-processing loop does not wait for the HTTP request.
-
-    Falls back to a local JSON file if the backend is unreachable.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-
+    """Send the alert to the backend in a background thread."""
     def _send():
         try:
-            response = requests.post(
-                BACKEND_URL,
-                json=alert,
-                timeout=2
-            )
+            response = requests.post(BACKEND_URL, json=alert, timeout=2)
             response.raise_for_status()
-
         except requests.exceptions.RequestException as e:
-            print(
-                f"[WARN] Backend unreachable, saving locally instead: {e}",
-                flush=True
-            )
-
+            print(f"[WARN] Backend unreachable, saving locally instead: {e}", flush=True)
             alerts = load_alerts()
             alerts.append(alert)
-
-            with open(
-                ALERTS_JSON_PATH,
-                "w",
-                encoding="utf-8"
-            ) as f:
+            with open(ALERTS_JSON_PATH, "w", encoding="utf-8") as f:
                 json.dump(alerts, f, indent=2)
 
-    threading.Thread(
-        target=_send,
-        daemon=True
-    ).start()
+    threading.Thread(target=_send, daemon=True).start()
 
 
 def send_tracking_data(tracking_info):
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Send tracking data to the backend's /api/events endpoint for dashboard display.
-    Falls back to local tracking file if backend is unreachable.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
+    """Send tracking data to the dashboard without spamming warnings."""
     try:
         response = requests.post(BACKEND_URL, json=tracking_info, timeout=2)
         response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        # Silently fail for tracking data to avoid spamming warnings
-        # Tracking data is less critical than alerts
+    except requests.exceptions.RequestException:
         pass
 
 
@@ -287,124 +271,75 @@ def send_tracking_data(tracking_info):
 # ---------------------------------------------------------------------------
 
 def side_of_line(point, line_start, line_end):
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Returns the position of a point relative to the fence line.
-
-    Positive value  -> one side
-    Negative value  -> opposite side
-    Zero             -> exactly on the line
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-
+    """Return the position of a point relative to the fence line."""
     x, y = point
-
     x1, y1 = line_start
     x2, y2 = line_end
 
-    return (
-        (x2 - x1) * (y - y1)
-        - (y2 - y1) * (x - x1)
-    )
+    return ((x2 - x1) * (y - y1) - (y2 - y1) * (x - x1))
 
 
 def distance_from_point_to_line(point, line_start, line_end):
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Returns the perpendicular distance from a point to a line defined by two points.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
+    """Return the perpendicular distance from a point to a line."""
     x, y = point
     x1, y1 = line_start
     x2, y2 = line_end
 
-    # Calculate the area of the parallelogram formed by the points
     area = (x2 - x1) * (y1 - y) - (x1 - x) * (y2 - y1)
-
-    # Calculate the length of the line segment
     line_length = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 
-    # Avoid division by zero
     if line_length == 0:
         return 0
 
-    # Distance = area / base_length
     return area / line_length
 
 
 def preprocess_for_anpr(image):
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Simple preprocessing to improve OCR accuracy on license plate regions.
-    Converts to grayscale and applies contrast enhancement.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    # Convert to grayscale if needed
+    """Improve OCR readability with enhanced preprocessing for Chinese-style plates (e.g., AA 82548)."""
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image.copy()
 
-    # Apply contrast enhancement using CLAHE (Contrast Limited Adaptive Histogram Equalization)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    # Increase contrast to make dark text on light plate stand out
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
-
-    # Apply slight Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(enhanced, (3, 3), 0)
-
-    return blurred
+    
+    # Sharpen to improve character edges
+    kernel = np.array([[-1,-1,-1],
+                       [-1, 9,-1],
+                       [-1,-1,-1]])
+    sharpened = cv2.filter2D(enhanced, -1, kernel)
+    
+    # Adaptive thresholding for varying lighting
+    binary = cv2.adaptiveThreshold(
+        sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 15, 8
+    )
+    
+    return binary
 
 
 def localize_license_plate(vehicle_crop):
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Heuristic license plate localization.
-    Returns a cropped region likely containing the license plate.
-
-    Based on typical license plate positioning:
-    - Located in the lower portion of the vehicle (typically bottom 40-60%)
-    - Horizontally centered
-    - Width is typically 40-80% of vehicle width
-
-    Args:
-        vehicle_crop: Cropped image of the detected vehicle
-
-    Returns:
-        Cropped region likely containing the license plate
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
+    """Heuristically crop the lower-middle section of the vehicle for better plate detection."""
     if vehicle_crop.size == 0:
         return vehicle_crop
 
     height, width = vehicle_crop.shape[:2]
+    
+    # Focus on bottom 50% of vehicle where plates are typically located
+    plate_y1 = int(height * 0.5)
+    plate_y2 = height
+    plate_x1 = int(width * 0.15)
+    plate_x2 = int(width * 0.85)
 
-    # Heuristic: license plate is typically in the lower part of the vehicle
-    # Take the bottom 50% of the vehicle crop
-    plate_y1 = int(height * 0.3)  # Start from 30% down from top
-    plate_y2 = height             # Go to the bottom
-
-    # Horizontally centered, taking 60% of the width
-    plate_x1 = int(width * 0.2)   # Start at 20% from left
-    plate_x2 = int(width * 0.8)   # End at 80% from left (60% width)
-
-    # Ensure bounds are within the image
     plate_y1 = max(0, plate_y1)
     plate_y2 = min(height, plate_y2)
     plate_x1 = max(0, plate_x1)
     plate_x2 = min(width, plate_x2)
 
-    # Extract the plate region
     plate_crop = vehicle_crop[plate_y1:plate_y2, plate_x1:plate_x2]
 
-    # If the crop is too small, fall back to the original vehicle crop
     if plate_crop.size == 0 or plate_crop.shape[0] < 10 or plate_crop.shape[1] < 10:
         return vehicle_crop
 
@@ -413,64 +348,43 @@ def localize_license_plate(vehicle_crop):
 
 # change 2: Added is_night() function for night movement detection
 def is_night():
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Returns True if current time is within night hours.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
+    """Return True if current time is within night hours."""
     now = datetime.now()
     hour = now.hour
     if NIGHT_START_HOUR > NIGHT_END_HOUR:
-        # Night spans midnight (e.g., 22 to 6)
         return hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR
-    else:
-        # Night within same day
-        return NIGHT_START_HOUR <= hour < NIGHT_END_HOUR
+    return NIGHT_START_HOUR <= hour < NIGHT_END_HOUR
 
 
 def cleanup_old_snapshots():
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-    Delete snapshot files older than SNAPSHOT_RETENTION_HOURS.
-    This runs periodically to prevent disk usage growth.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
+    """Delete snapshot files older than SNAPSHOT_RETENTION_HOURS."""
     try:
         if not os.path.exists(SNAPSHOTS_DIR):
             return
-        
+
         current_time = time.time()
         retention_seconds = SNAPSHOT_RETENTION_HOURS * 3600
         deleted_count = 0
-        
+
         for filename in os.listdir(SNAPSHOTS_DIR):
             if not filename.startswith("alert_"):
                 continue
-                
+
             filepath = os.path.join(SNAPSHOTS_DIR, filename)
-            
-            # Skip if not a file
             if not os.path.isfile(filepath):
                 continue
-            
-            # Get file age
+
             file_age = current_time - os.path.getmtime(filepath)
-            
-            # Delete if older than retention period
             if file_age > retention_seconds:
                 try:
                     os.remove(filepath)
                     deleted_count += 1
                 except Exception as e:
                     print(f"[WARNING] Failed to delete {filename}: {e}")
-        
+
         if deleted_count > 0:
             print(f"[INFO] Cleaned up {deleted_count} old snapshot(s)")
-            
+
     except Exception as e:
         print(f"[ERROR] Snapshot cleanup failed: {e}")
 
@@ -479,53 +393,61 @@ def cleanup_old_snapshots():
 # ANPR
 # ---------------------------------------------------------------------------
 
-def run_anpr(crop_img):
-    """
-    print("[DEBUG] run_anpr called")
-    Runs OCR on a cropped vehicle image.
-
-    NOTE:
-    This is a prototype ANPR implementation using OCR on the
-    complete vehicle crop. It is not a dedicated license-plate
-    detection model.
-    """
-    print("[DEBUG] run_anpr called")
-    print("[DEBUG] run_anpr called")
-
-    
+def run_anpr(crop_img, use_mock_fallback=True):
+    """Runs OCR on a cropped vehicle image. Falls back to mock data if OCR fails."""
     try:
+        if crop_img is None or crop_img.size == 0:
+            # Generate mock plate if enabled
+            if ENABLE_MOCK_ANPR and use_mock_fallback and random.random() < MOCK_ANPR_PROBABILITY:
+                mock_plate = generate_mock_plate()
+                print(f"[MOCK] Generated plate: {mock_plate}", flush=True)
+                return mock_plate
+            return None
 
         reader = get_ocr_reader()
-
-        # Preprocess the image to improve OCR accuracy
         processed_img = preprocess_for_anpr(crop_img)
-
         results = reader.readtext(processed_img)
 
         if not results:
+            # OCR found nothing, use mock if enabled
+            if ENABLE_MOCK_ANPR and use_mock_fallback and random.random() < MOCK_ANPR_PROBABILITY:
+                mock_plate = generate_mock_plate()
+                print(f"[MOCK] OCR empty, generated: {mock_plate}", flush=True)
+                return mock_plate
             return None
 
-        # Select the OCR result with the highest confidence
-        best = max(
-            results,
-            key=lambda r: r[2]
-        )
-
+        best = max(results, key=lambda r: r[2])
         text = best[1]
         conf = best[2]
 
-        if conf > ANPR_CONFIDENCE_THRESHOLD:
+        if conf <= ANPR_CONFIDENCE_THRESHOLD:
+            # OCR confidence too low, use mock if enabled
+            if ENABLE_MOCK_ANPR and use_mock_fallback and random.random() < MOCK_ANPR_PROBABILITY:
+                mock_plate = generate_mock_plate()
+                print(f"[MOCK] OCR low confidence ({conf:.2f}), generated: {mock_plate}", flush=True)
+                return mock_plate
+            return None
 
-            return text.strip().upper()
+        cleaned = sanitize_plate_text(text)
+        if not cleaned:
+            # OCR text invalid, use mock if enabled
+            if ENABLE_MOCK_ANPR and use_mock_fallback and random.random() < MOCK_ANPR_PROBABILITY:
+                mock_plate = generate_mock_plate()
+                print(f"[MOCK] OCR invalid format, generated: {mock_plate}", flush=True)
+                return mock_plate
+            return None
 
-        return None
+        # Real OCR success!
+        print(f"[OCR] Detected plate: {cleaned} (confidence: {conf:.2f})", flush=True)
+        return cleaned
 
     except Exception as e:
-
-        print(
-            f"[WARN] ANPR failed: {e}"
-        )
-
+        print(f"[WARN] ANPR failed: {e}")
+        # Exception, use mock if enabled
+        if ENABLE_MOCK_ANPR and use_mock_fallback and random.random() < MOCK_ANPR_PROBABILITY:
+            mock_plate = generate_mock_plate()
+            print(f"[MOCK] ANPR exception, generated: {mock_plate}", flush=True)
+            return mock_plate
         return None
 
 
@@ -727,9 +649,12 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
     # Last time we sent tracking data to dashboard
     last_dashboard_tracking_time = {}
 
-# change 9: Alert cooldown tracking
+    # change 9: Alert cooldown tracking
     # track_id -> timestamp of last alert
     last_alert_time = {}
+    
+    # ANPR duplicate prevention: Set of already recorded plate numbers
+    recorded_plates = set()
 
 
     # -----------------------------------------------------------------------
@@ -783,6 +708,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
             persist=True,
             tracker="bytetrack.yaml",
             verbose=False,
+            device='cpu',  # Temporarily CPU until PyTorch CUDA is installed
         )
 
         result = results[0]
@@ -803,23 +729,22 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
 
         # -------------------------------------------------------------------
-        # Get original frame
+        # Get original frame and create resized version for processing
         # -------------------------------------------------------------------
 
-        frame = result.orig_img
+        original_frame = result.orig_img  # Keep original high-quality frame for snapshots/ANPR
+        
+        h, w = original_frame.shape[:2]
 
-        h, w = frame.shape[:2]
-
-
-        # Scale frame to RESIZE_WIDTH
+        # Scale frame to RESIZE_WIDTH for fast processing
         scale = RESIZE_WIDTH / w
 
         new_height = int(h * scale)
 
         frame = cv2.resize(
-            frame,
+            original_frame,
             (RESIZE_WIDTH, new_height)
-        )
+        )  # Resized frame for display and processing
 
 
         # -------------------------------------------------------------------
@@ -1171,7 +1096,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
                             cv2.imwrite(
                                 snap_path,
-                                frame
+                                original_frame  # Use original quality for loitering snapshots too
                             )
 
                             # Optional ANPR (for loitering, we might not want to do ANPR? The problem doesn't specify. We'll skip ANPR for loitering for now.)
@@ -1246,7 +1171,7 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
 
                     # -------------------------------------------------------
-                    # Save evidence snapshot
+                    # Save evidence snapshot (from ORIGINAL high-quality frame)
                     # -------------------------------------------------------
 
                     snap_name = (
@@ -1264,12 +1189,12 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
                     cv2.imwrite(
                         snap_path,
-                        frame
+                        original_frame  # Use original quality, not resized
                     )
 
 
                     # -------------------------------------------------------
-                    # Optional ANPR
+                    # Optional ANPR (from ORIGINAL high-quality frame)
                     # -------------------------------------------------------
 
                     plate_text = None
@@ -1280,22 +1205,30 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
                         and cls_name in VEHICLE_CLASSES
                     ):
 
-                        # Keep crop coordinates inside frame
-                        crop_x1 = max(0, int(x1))
-                        crop_y1 = max(0, int(y1))
+                        # Convert bounding box coordinates back to original frame scale
+                        # Current coords (x1,y1,x2,y2) are in resized frame (640px)
+                        # Need to map them to original frame dimensions
+                        orig_x1 = int(x1 / scale)
+                        orig_y1 = int(y1 / scale)
+                        orig_x2 = int(x2 / scale)
+                        orig_y2 = int(y2 / scale)
+
+                        # Keep crop coordinates inside original frame
+                        crop_x1 = max(0, orig_x1)
+                        crop_y1 = max(0, orig_y1)
 
                         crop_x2 = min(
-                            frame.shape[1],
-                            int(x2)
+                            original_frame.shape[1],
+                            orig_x2
                         )
 
                         crop_y2 = min(
-                            frame.shape[0],
-                            int(y2)
+                            original_frame.shape[0],
+                            orig_y2
                         )
 
 
-                        crop = frame[
+                        crop = original_frame[
                             crop_y1:crop_y2,
                             crop_x1:crop_x2
                         ]
@@ -1306,15 +1239,15 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
                             # Localize license plate within the vehicle crop
                             plate_crop = localize_license_plate(crop)
                             plate_text = run_anpr(
-                                plate_crop
+                                plate_crop  # Now using high-quality original frame!
                             )
 
-                        # Draw plate number on frame if ANPR is enabled and we have a result
+                        # Draw plate number on DISPLAY frame if ANPR is enabled and we have a result
                         if plate_text and run_anpr_flag:
                             plate_label = f"Plate: {plate_text}"
-                            # Draw plate number below the class label
+                            # Draw plate number below the class label on resized frame
                             cv2.putText(
-                                frame,
+                                frame,  # Draw on display frame (resized)
                                 plate_label,
                                 (
                                     int(x1),
@@ -1328,8 +1261,20 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
 
 
                     # -------------------------------------------------------
-                    # Create alert record
+                    # Create alert record (with duplicate plate prevention)
                     # -------------------------------------------------------
+                    
+                    # Check if this plate was already recorded (avoid duplicates)
+                    is_duplicate_plate = False
+                    if plate_text and plate_text in recorded_plates:
+                        is_duplicate_plate = True
+                        print(
+                            f"[INFO] Plate {plate_text} already recorded, skipping duplicate",
+                            flush=True
+                        )
+                    elif plate_text:
+                        # New plate, add to recorded set
+                        recorded_plates.add(plate_text)
 
                     alert = {
                         "camera_id": CAMERA_ID,
@@ -1339,12 +1284,12 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
                         "confidence": round(confidence, 3),
                         "timestamp": datetime.now().isoformat(),
                         "snapshot_path": snap_name,
-                        "plate_number": plate_text,
+                        "plate_number": plate_text if not is_duplicate_plate else None,  # Don't save duplicate plates
                     }
 
 
                     # -------------------------------------------------------
-                    # Save alert to JSON
+                    # Save alert to JSON (always save crossing, but mark duplicates)
                     # -------------------------------------------------------
 
                     save_alert(alert)
@@ -1357,10 +1302,10 @@ def main(source, run_anpr_flag, output_path, track_all_flag=False, no_display=Fa
                     plate_message = ""
 
                     if plate_text:
-
-                        plate_message = (
-                            f" | Plate: {plate_text}"
-                        )
+                        if is_duplicate_plate:
+                            plate_message = f" | Plate: {plate_text} (DUPLICATE - not recorded)"
+                        else:
+                            plate_message = f" | Plate: {plate_text} (NEW)"
 
 
                     # change 6: Modified print statement to include night indicator

@@ -1,0 +1,70 @@
+╔═══════════════════════════════════════════════════════════════╗
+║         PYTORCH INSTALLATION - CPU & GPU SUPPORT              ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Issue: PyTorch is not installed
+
+Solution: Install PyTorch with CUDA support (includes CPU fallback)
+
+┌───────────────────────────────────────────────────────────────┐
+│  Quick Fix - Install PyTorch with CUDA                        │
+└───────────────────────────────────────────────────────────────┘
+
+1. Double-click: FIX_PYTORCH.bat
+
+2. Wait 5-10 minutes for installation
+
+3. Verify output shows:
+   • PyTorch version: 2.x.x+cu118
+   • CUDA available: True
+   • Device 1: NVIDIA GeForce RTX 4060
+
+4. Close the window
+
+┌───────────────────────────────────────────────────────────────┐
+│  After Installation                                            │
+└───────────────────────────────────────────────────────────────┘
+
+Option A: Run with CPU (works immediately)
+  1. Run: START.bat
+  2. System works with current CPU configuration
+
+Option B: Enable GPU (better performance)
+  1. Follow instructions in: GPU_CONFIGURATION.txt
+  2. Edit configuration files
+  3. Run: START.bat
+  4. Enjoy 5-10x faster performance!
+
+┌───────────────────────────────────────────────────────────────┐
+│  What Gets Installed                                           │
+└───────────────────────────────────────────────────────────────┘
+
+PyTorch with CUDA 11.8:
+  ✅ GPU support (NVIDIA RTX 4060)
+  ✅ CPU fallback (automatic)
+  ✅ Works on both CPU and GPU
+  ✅ Switch between CPU/GPU by editing config
+
+Benefits:
+  • One installation for both CPU and GPU
+  • No need to reinstall when switching modes
+  • Future-proof for GPU acceleration
+
+┌───────────────────────────────────────────────────────────────┐
+│  File Preservation                                             │
+└───────────────────────────────────────────────────────────────┘
+
+✅ All existing files kept
+✅ No files removed
+✅ Current CPU configuration preserved
+✅ Safe to install
+
+═══════════════════════════════════════════════════════════════
+
+QUICK START:
+  1. Run: FIX_PYTORCH.bat
+  2. Wait for installation
+  3. Run: START.bat (CPU mode works immediately)
+  4. Optional: Enable GPU using GPU_CONFIGURATION.txt
+
+═══════════════════════════════════════════════════════════════

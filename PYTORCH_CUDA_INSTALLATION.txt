@@ -1,0 +1,65 @@
+╔═══════════════════════════════════════════════════════════════╗
+║         PYTORCH CUDA & CPU BACKUP REFERENCE                   ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Current Installation:
+  PyTorch CPU-only: torch-2.14.0+cpu (BACKUP - Keep installed)
+  
+CUDA PyTorch Installation (if needed later):
+  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+┌───────────────────────────────────────────────────────────────┐
+│  Current System Configuration (CPU Mode)                      │
+└───────────────────────────────────────────────────────────────┘
+
+✅ Stream: 1280x720 @ 20fps (balanced for CPU)
+✅ Processing: 960px (CPU-friendly)
+✅ YOLOv8: CPU mode (device='cpu')
+✅ EasyOCR: CPU mode (gpu=False)
+✅ Video: test_2.mp4
+✅ ANPR: Uses original stream quality
+
+This configuration is optimized for CPU and will work reliably.
+
+┌───────────────────────────────────────────────────────────────┐
+│  To Enable GPU (If CUDA PyTorch is Installed)                │
+└───────────────────────────────────────────────────────────────┘
+
+Edit cv_pipeline\detect_track_fence.py:
+  • Line ~630: device='cpu' → device=1
+  • Line ~131: gpu=False → gpu=True
+  • Line 27: RESIZE_WIDTH = 960 → RESIZE_WIDTH = 1280
+  • Line 28: PROCESS_EVERY_N_FRAMES = 3 → PROCESS_EVERY_N_FRAMES = 2
+  • Line 67: LINE_END = (960, 350) → LINE_END = (1280, 400)
+
+Edit START.bat:
+  • Change: scale=1280:720,fps=20 → scale=1920:1080,fps=30
+  • Change: -b:v 2000k → -b:v 4000k
+
+┌───────────────────────────────────────────────────────────────┐
+│  Verify CUDA PyTorch Installation                             │
+└───────────────────────────────────────────────────────────────┘
+
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+
+Should show: CUDA: True
+
+┌───────────────────────────────────────────────────────────────┐
+│  PyTorch Version Reference (Backup)                           │
+└───────────────────────────────────────────────────────────────┘
+
+CPU-only (current):
+  pip install torch torchvision torchaudio
+
+CUDA 11.8 (for NVIDIA GPU):
+  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+CUDA 12.1 (alternative):
+  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+═══════════════════════════════════════════════════════════════
+
+System is configured for CPU mode and ready to use.
+GPU acceleration can be enabled later if needed.
+
+═══════════════════════════════════════════════════════════════

@@ -17,9 +17,9 @@ if "%SOURCE%"=="" set SOURCE=..\sample_videos\test.mp4
 echo Source: %SOURCE%
 echo.
 
-REM Activate virtual environment and run pipeline
+REM Activate virtual environment and run pipeline with ANPR enabled
 cd /d "%~dp0"
 call ..\venv\Scripts\activate.bat
-python detect_track_fence.py --source "%SOURCE%"
+python detect_track_fence.py --source "%SOURCE%" --anpr
 
 pause

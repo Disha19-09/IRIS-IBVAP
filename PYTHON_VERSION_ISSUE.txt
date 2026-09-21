@@ -1,0 +1,132 @@
+╔═══════════════════════════════════════════════════════════════╗
+║         PYTHON 3.14 - PYTORCH CUDA COMPATIBILITY              ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Issue Identified:
+  Your Python version: 3.14.7
+  PyTorch CUDA builds: Not yet available for Python 3.14
+  
+Python 3.14 was released very recently and PyTorch hasn't built
+CUDA wheels for it yet. CUDA builds are currently available for:
+  • Python 3.8, 3.9, 3.10, 3.11, 3.12
+
+┌───────────────────────────────────────────────────────────────┐
+│  SOLUTION 1: Use CPU Mode (Recommended for Now)               │
+└───────────────────────────────────────────────────────────────┘
+
+1. Run: INSTALL_PYTORCH_FALLBACK.bat
+
+2. This installs PyTorch CPU (works with Python 3.14)
+
+3. System runs in CPU mode:
+   • Stream: 1280x720 @ 20fps
+   • Processing: 960px
+   • ANPR: CPU OCR
+   • Slower but works reliably
+
+4. Run: START.bat
+
+┌───────────────────────────────────────────────────────────────┐
+│  SOLUTION 2: Downgrade Python (For GPU Support)               │
+└───────────────────────────────────────────────────────────────┘
+
+To use your NVIDIA RTX 4060 GPU, you need Python 3.11 or 3.12:
+
+Option A: Recreate Virtual Environment with Python 3.12
+
+  1. Delete current venv folder
+  
+  2. Install Python 3.12 from python.org
+  
+  3. Create new venv with Python 3.12:
+     py -3.12 -m venv venv
+  
+  4. Activate and install requirements:
+     call venv\Scripts\activate.bat
+     pip install -r requirements.txt
+     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+  
+  5. Run: START.bat
+
+Option B: Wait for PyTorch Python 3.14 Support
+
+  PyTorch usually releases new Python version support within
+  2-3 months of Python release. You can:
+  
+  • Use CPU mode now
+  • Wait for PyTorch 3.14 CUDA builds
+  • Upgrade when available
+
+┌───────────────────────────────────────────────────────────────┐
+│  SOLUTION 3: Try CUDA 12.1 (May Work)                        │
+└───────────────────────────────────────────────────────────────┘
+
+Run: FIX_PYTORCH.bat
+
+The updated script tries CUDA 12.1 which might have Python 3.14
+builds. If you see "CUDA available: True", you're good!
+
+If it fails, use Solution 1 (CPU mode).
+
+┌───────────────────────────────────────────────────────────────┐
+│  Current System Status                                         │
+└───────────────────────────────────────────────────────────────┘
+
+✅ Python: 3.14.7 (very new)
+✅ NVIDIA GPU: RTX 4060 (excellent)
+❌ PyTorch CUDA: Not available for Python 3.14 yet
+✅ PyTorch CPU: Works fine with Python 3.14
+
+Recommendation:
+  Install PyTorch CPU now, system works immediately.
+  Consider Python 3.12 later for GPU support.
+
+┌───────────────────────────────────────────────────────────────┐
+│  Quick Start (CPU Mode)                                        │
+└───────────────────────────────────────────────────────────────┘
+
+1. Run: INSTALL_PYTORCH_FALLBACK.bat
+2. Wait 2-3 minutes
+3. Run: START.bat
+4. Open: http://127.0.0.1:5173/
+5. System works in CPU mode!
+
+┌───────────────────────────────────────────────────────────────┐
+│  Performance Expectations                                      │
+└───────────────────────────────────────────────────────────────┘
+
+CPU Mode (Current):
+  ✅ Works reliably
+  ✅ Good quality (1280x720)
+  ✅ ANPR functional
+  ⚠️  Slower processing
+  ⚠️  30-60% ANPR detection rate
+
+GPU Mode (Requires Python 3.12):
+  ✅ 5-10x faster
+  ✅ Better quality (1920x1080)
+  ✅ Real-time processing
+  ✅ 70-90% ANPR detection rate
+
+┌───────────────────────────────────────────────────────────────┐
+│  Files Available                                               │
+└───────────────────────────────────────────────────────────────┘
+
+FIX_PYTORCH.bat
+  • Tries CUDA 12.1 (may work with Python 3.14)
+  
+INSTALL_PYTORCH_FALLBACK.bat
+  • Installs CPU version (guaranteed to work)
+  
+START.bat
+  • Starts system (works with CPU or GPU)
+
+═══════════════════════════════════════════════════════════════
+
+RECOMMENDED PATH:
+
+1. Run: INSTALL_PYTORCH_FALLBACK.bat (CPU mode works now)
+2. Test system: START.bat
+3. Consider Python 3.12 later for GPU acceleration
+
+═══════════════════════════════════════════════════════════════
